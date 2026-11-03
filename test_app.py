@@ -28,7 +28,6 @@ from app import (  # noqa: E402
     resumen_panel,
     ultimo_respaldo,
 )
-from simulacion import GUIA, cargar_datos  # noqa: E402
 
 # Las pruebas nunca deben copiar al pendrive real de la compu donde se corren.
 app.config.update(BUSCAR_PENDRIVE=False, RESPALDOS_EXTRA=[])
@@ -253,44 +252,6 @@ class RecorridoCompleto(unittest.TestCase):
         self.assertIn("&lt;b&gt;Noa&lt;/b&gt;", texto)
         self.assertNotIn("<b>Noa</b>", texto)
         self.assertEqual(self.cliente.get("/ordenes/999999/rapida").status_code, 404)
-
-    def test_15_datos_de_simulacion_cubren_todo_el_panel(self):
-        # El día 31 y el día 1 son los casos difíciles: ningún mes debe quedar sin datos.
-        for hoy in (date(2026, 8, 31), date(2026, 3, 1)):
-            with self.subTest(hoy=hoy):
-                conexion = sqlite3.connect(":memory:")
-                conexion.executescript(ESQUEMA)
-                cargar_datos(conexion, hoy)
-
-                estados = {fila[0] for fila in conexion.execute("SELECT DISTINCT estado FROM ordenes")}
-                self.assertEqual(estados, {"Pendiente", "En Proceso", "Completado"})
-                meses = {
-                    fila[0]
-                    for fila in conexion.execute(
-                        "SELECT DISTINCT substr(fecha_completado, 1, 7) FROM ordenes WHERE estado = 'Completado'"
-                    )
-                }
-                self.assertEqual(len(meses), 6)
-                futuras = conexion.execute(
-                    "SELECT COUNT(*) FROM ordenes WHERE fecha_completado > ? OR fecha_ingreso > ?",
-                    (hoy.isoformat(), hoy.isoformat()),
-                ).fetchone()[0]
-                self.assertEqual(futuras, 0)
-                conexion.close()
-
-    def test_16_comentarios_de_simulacion_aparecen_en_pantalla(self):
-        for ruta in GUIA:
-            with self.subTest(ruta=ruta):
-                self.assertIn(ruta, app.view_functions)
-
-        self.assertNotIn("Comentario:", self.cliente.get("/").get_data(as_text=True))
-        app.config.update(SIMULACION=True, GUIA=GUIA)
-        try:
-            texto = self.cliente.get("/").get_data(as_text=True)
-        finally:
-            app.config.update(SIMULACION=False, GUIA={})
-        self.assertIn("Modo simulación", texto)
-        self.assertIn(GUIA["inicio"]["titulo"], texto)
 
     def test_17_listas_se_reparten_en_paginas(self):
         for numero in range(POR_PAGINA + 2):

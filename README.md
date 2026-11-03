@@ -25,14 +25,6 @@ La primera vez que abres el sistema te pide crear la cuenta del **dueño**. Con 
 - **Usuarios que se van:** no se borran, se desactivan. Así se conserva su historial.
 - **Contraseñas olvidadas:** el dueño le pone una nueva a cualquier usuario en **Usuarios**. Anota la contraseña del dueño en un lugar seguro.
 
-## Simulación con datos de ejemplo
-
-Haz doble clic en `simulacion.bat` para ver el sistema funcionando con clientes, vehículos y órdenes inventados, y con un comentario en cada pantalla que explica cómo usarla.
-
-Usuarios de prueba, todos con la contraseña `1234`: `roberto` (dueño), `juan` (empleado, turno mañana) y `pedro` (empleado, turno tarde).
-
-La simulación se abre en <http://127.0.0.1:5001> y usa su propia carpeta, `simulacion_datos`. No toca `taller.db`. Cada vez que la abres vuelve a empezar con los datos de ejemplo, así que puedes probar lo que quieras.
-
 ## Instalación manual en Windows
 
 Necesitas Python 3.10 o superior. Compruébalo en PowerShell, dentro de esta carpeta:
@@ -133,8 +125,6 @@ requirements.txt   Dependencias de Python
 test_app.py        Pruebas automáticas
 templates/         Pantallas HTML
 iniciar.bat        Instala lo necesario e inicia el sistema con doble clic
-simulacion.bat     Abre la simulación con datos de ejemplo
-simulacion.py      Datos de ejemplo y comentarios de cada pantalla
 taller.db          Base de datos (se crea al iniciar)
 respaldos/         Copias de seguridad diarias (se crea al iniciar)
 .secret_key        Clave de sesión (se crea al iniciar; no la compartas)

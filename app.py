@@ -517,9 +517,6 @@ def datos_plantillas():
         "es_dueno": es_dueno(),
         "NOMBRES_ROL": NOMBRES_ROL,
         "nav_conteos": conteos_por_estado(),
-        # Solo tienen contenido en el modo simulación (ver simulacion.py).
-        "SIMULACION": app.config.get("SIMULACION", False),
-        "guia": app.config.get("GUIA", {}).get(request.endpoint),
     }
 
 

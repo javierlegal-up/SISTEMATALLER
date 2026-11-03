@@ -1,12 +1,6 @@
 @echo off
-title Sistema del Taller
+title Taller San Cayetano
 cd /d "%~dp0"
-
-set "PROGRAMA=app.py"
-set "PUERTO=5000"
-if /i "%~1"=="demo" set "PROGRAMA=simulacion.py"
-if /i "%~1"=="demo" set "PUERTO=5001"
-if /i "%~1"=="demo" title Simulacion del Taller
 
 set "PY="
 where py >nul 2>nul && set "PY=py -3"
@@ -47,16 +41,15 @@ if errorlevel 1 (
 )
 
 echo.
-if /i "%~1"=="demo" echo MODO SIMULACION: datos inventados. Tus datos reales no se tocan.
-echo Sistema del Taller en marcha: http://127.0.0.1:%PUERTO%
+echo Taller San Cayetano en marcha: http://127.0.0.1:5000
 echo NO cierres esta ventana mientras uses el sistema.
 echo Para apagarlo, cierra esta ventana.
 echo.
 
 rem Espera unos segundos a que arranque el servidor y abre el navegador.
-start "" /min cmd /c "ping -n 4 127.0.0.1 >nul & start http://127.0.0.1:%PUERTO%"
+start "" /min cmd /c "ping -n 4 127.0.0.1 >nul & start http://127.0.0.1:5000"
 
-"venv\Scripts\python.exe" %PROGRAMA%
+"venv\Scripts\python.exe" app.py
 
 echo.
 echo El sistema se detuvo.
