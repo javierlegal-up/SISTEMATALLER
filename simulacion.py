@@ -109,11 +109,12 @@ GUIA = {
         ],
     },
     "actividad": {
-        "titulo": "Actividad: quién hizo qué y cuándo",
+        "titulo": "Actividad: el trabajo de cada persona en un período",
         "pasos": [
-            "Cada vez que alguien crea, edita o cambia el estado de una orden, queda anotado aquí.",
-            "El turno (mañana o tarde) se calcula por la hora.",
-            "Filtra por persona o por día. Prueba con Juan.",
+            "Arriba están los totales del período: órdenes creadas, órdenes gestionadas, cambios de estado y clientes registrados.",
+            "Rendimiento por persona compara a todo el equipo. Haz clic en Juan para ver solo su trabajo.",
+            "Cambia el período con Desde y Hasta, o con Este mes y Mes anterior. Prueba con Mes anterior.",
+            "Solo cuenta el trabajo del taller. Inicio y cierre de sesión no se registran.",
         ],
     },
     "inicio": {

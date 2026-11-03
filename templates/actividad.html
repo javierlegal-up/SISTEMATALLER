@@ -1,20 +1,100 @@
 {% extends "base.html" %}
 {% from "_macros.html" import paginacion_lista %}
 {% block titulo %}Actividad{% endblock %}
-{% block contenido %}
-  <h1 class="text-2xl font-semibold">Actividad <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
-  <p class="mb-5 mt-1 text-sm text-neutral-500">Quién hizo qué y cuándo. El turno se calcula por la hora.</p>
 
-  <form method="get" class="mb-4 flex flex-wrap gap-2">
-    <select class="campo !mt-0 !w-auto" name="usuario" aria-label="Persona">
-      <option value="">Todas las personas</option>
-      {% for p in personas %}<option value="{{ p.id }}" {{ 'selected' if p.id == usuario_id }}>{{ p.nombre }}</option>{% endfor %}
-    </select>
-    <input class="campo !mt-0 !w-auto" type="date" name="fecha" value="{{ dia }}" aria-label="Día">
-    <button class="btn-secundario" type="submit">Filtrar</button>
-    {% if usuario_id or dia %}<a class="btn-secundario" href="{{ url_for('actividad') }}">Limpiar</a>{% endif %}
+{% macro enlace_periodo(texto, rango) %}
+  {% set activo = desde == rango[0] and hasta == rango[1] %}
+  <a class="rounded-full border px-3 py-1 text-xs font-medium {{ 'border-red-600 bg-red-600 text-white' if activo else 'border-slate-300 bg-white text-slate-600 hover:border-red-400' }}"
+     href="{{ url_for('actividad', usuario=usuario_id, desde=rango[0].isoformat(), hasta=rango[1].isoformat(), todo='1' if incluir_admin else none) }}">{{ texto }}</a>
+{% endmacro %}
+
+{% block contenido %}
+  <h1 class="text-2xl font-semibold">Actividad</h1>
+  <p class="mb-5 mt-1 text-sm text-neutral-500">
+    Trabajo de {{ persona.nombre if persona else 'todo el equipo' }}
+    del <strong>{{ desde.strftime('%d/%m/%Y') }}</strong> al <strong>{{ hasta.strftime('%d/%m/%Y') }}</strong>.
+  </p>
+
+  {# Filtros: persona, período y, opcionalmente, acciones administrativas. #}
+  <form method="get" class="tarjeta mb-5 space-y-3">
+    <div class="flex flex-wrap items-end gap-3">
+      <label class="etiqueta">Persona
+        <select class="campo" name="usuario">
+          <option value="">Todo el equipo</option>
+          {% for p in personas %}<option value="{{ p.id }}" {{ 'selected' if p.id == usuario_id }}>{{ p.nombre }} · {{ NOMBRES_ROL[p.rol] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="etiqueta">Desde<input class="campo" type="date" name="desde" value="{{ desde.isoformat() }}"></label>
+      <label class="etiqueta">Hasta<input class="campo" type="date" name="hasta" value="{{ hasta.isoformat() }}"></label>
+      <button class="btn-primario" type="submit">Filtrar</button>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-slate-500">Períodos rápidos:</span>
+      {{ enlace_periodo('Este mes', este_mes) }}
+      {{ enlace_periodo('Mes anterior', mes_anterior) }}
+      <label class="ml-auto flex items-center gap-2 text-xs text-slate-600">
+        <input type="checkbox" name="todo" value="1" class="h-4 w-4" {{ 'checked' if incluir_admin }} onchange="this.form.submit()">
+        Incluir acciones administrativas (borrados, usuarios, precios, copias)
+      </label>
+    </div>
   </form>
 
+  {# Métricas del período, siempre solo de producción. #}
+  <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="tarjeta border-t-4 border-t-red-600">
+      <p class="text-sm text-slate-500">Órdenes creadas</p>
+      <p class="mt-1 text-3xl font-semibold" data-metrica="creadas">{{ metricas.creadas }}</p>
+    </div>
+    <div class="tarjeta border-t-4 border-t-red-600">
+      <p class="text-sm text-slate-500">Órdenes gestionadas</p>
+      <p class="mt-1 text-3xl font-semibold" data-metrica="gestionadas">{{ metricas.gestionadas }}</p>
+      <p class="mt-1 text-xs text-slate-500">Distintas en las que trabajó: creó, editó o cambió de estado</p>
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">Cambios de estado</p>
+      <p class="mt-1 text-3xl font-semibold" data-metrica="cambios">{{ metricas.cambios }}</p>
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">Clientes registrados</p>
+      <p class="mt-1 text-3xl font-semibold" data-metrica="clientes">{{ metricas.clientes }}</p>
+    </div>
+  </div>
+
+  {% if not usuario_id %}
+    <section class="mb-6">
+      <h2 class="mb-3 text-lg font-semibold">Rendimiento por persona</h2>
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th class="px-4 py-3">Persona</th>
+              <th class="px-4 py-3 text-right">Órdenes creadas</th>
+              <th class="px-4 py-3 text-right">Órdenes gestionadas</th>
+              <th class="px-4 py-3 text-right">Cambios de estado</th>
+              <th class="px-4 py-3 text-right">Clientes registrados</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for r in rendimiento %}
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">
+                  <a class="enlace font-medium" href="{{ url_for('actividad', usuario=r.id, desde=desde.isoformat(), hasta=hasta.isoformat()) }}">{{ r.nombre }}</a>
+                  <span class="text-xs text-slate-500">{{ NOMBRES_ROL[r.rol] }}</span>
+                </td>
+                <td class="px-4 py-3 text-right font-semibold">{{ r.creadas }}</td>
+                <td class="px-4 py-3 text-right">{{ r.gestionadas }}</td>
+                <td class="px-4 py-3 text-right">{{ r.cambios }}</td>
+                <td class="px-4 py-3 text-right">{{ r.clientes }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-2 text-xs text-slate-500">Haz clic en un nombre para ver solo su trabajo.</p>
+    </section>
+  {% endif %}
+
+  <h2 class="mb-3 text-lg font-semibold">Detalle <span class="text-base font-normal text-slate-500">({{ paginacion.total }})</span></h2>
   {% if registros %}
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-sm">
@@ -44,6 +124,6 @@
     </div>
     {{ paginacion_lista(paginacion) }}
   {% else %}
-    <p class="tarjeta text-sm text-slate-500">No hay actividad para mostrar.</p>
+    <p class="tarjeta text-sm text-slate-500">No hay actividad en este período.</p>
   {% endif %}
 {% endblock %}

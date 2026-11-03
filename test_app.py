@@ -677,6 +677,65 @@ class RecorridoCompleto(unittest.TestCase):
             self.cliente.post(f"/usuarios/{DUENO_ID}/activo", follow_redirects=True).get_data(as_text=True),
         )
 
+    def test_31_actividad_mide_produccion_por_persona_y_periodo(self):
+        conexion = conectar()
+        try:
+            antes = conexion.execute(
+                "SELECT COUNT(*) AS total FROM actividad WHERE accion IN ('Inició sesión', 'Cerró sesión')"
+            ).fetchone()["total"]
+        finally:
+            conexion.close()
+        otro = app.test_client()
+        otro.post("/login", data={"usuario": "juan", "clave": "clave-juan"})
+        otro.post("/logout")
+
+        self.cliente.post("/clientes/nuevo", data=datos_cliente("Leo Paz", "REN111"))
+        self.entrar_como(EMPLEADO_ID)
+        for _ in range(2):
+            self.cliente.post(
+                "/ordenes/nueva",
+                data={
+                    "vehiculo_id": self.vehiculo_id("REN111"),
+                    "fallas": "Revisión",
+                    "estado": "Pendiente",
+                    "fecha_ingreso": "2026-11-03",
+                    "item_tipo": ["Servicio"],
+                    "item_descripcion": ["Revisión general"],
+                    "item_cantidad": ["1"],
+                },
+            )
+
+        self.entrar_como(DUENO_ID)
+        self.cliente.post(f"/usuarios/{EMPLEADO_ID}/clave", data={"clave": "clave-juan", "clave2": "clave-juan"})
+
+        conexion = conectar()
+        try:
+            despues = conexion.execute(
+                "SELECT COUNT(*) AS total FROM actividad WHERE accion IN ('Inició sesión', 'Cerró sesión')"
+            ).fetchone()["total"]
+            creadas_juan = conexion.execute(
+                "SELECT COUNT(*) AS total FROM actividad WHERE usuario_id = ? AND accion = 'Creó la orden'"
+                " AND substr(momento, 1, 7) = ?",
+                (EMPLEADO_ID, date.today().isoformat()[:7]),
+            ).fetchone()["total"]
+        finally:
+            conexion.close()
+        self.assertEqual(despues, antes)  # Entrar y salir no se registra.
+
+        # Métrica de Juan en el mes en curso: coincide con lo que hay en la base.
+        texto = self.pagina(f"/actividad?usuario={EMPLEADO_ID}")
+        self.assertIn(f'data-metrica="creadas">{creadas_juan}<', texto)
+        self.assertGreaterEqual(creadas_juan, 2)
+        # Las acciones administrativas no aparecen salvo que se pidan.
+        self.assertNotIn("Cambió una contraseña", self.pagina("/actividad"))
+        self.assertIn("Cambió una contraseña", self.pagina("/actividad?todo=1"))
+        # Fuera del período no hay nada.
+        vacio = self.pagina(f"/actividad?usuario={EMPLEADO_ID}&desde=2000-01-01&hasta=2000-01-31")
+        self.assertIn('data-metrica="creadas">0<', vacio)
+        self.assertIn("No hay actividad en este período", vacio)
+        # Sin persona elegida aparece la comparación de todo el equipo.
+        self.assertIn("Rendimiento por persona", self.pagina("/actividad"))
+
     # --- Ayudas ---
     def lineas(self, orden_id):
         conexion = conectar()

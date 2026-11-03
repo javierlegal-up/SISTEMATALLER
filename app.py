@@ -68,10 +68,20 @@ POR_PAGINA = 15  # Filas por página en las listas, para evitar el scroll largo.
 
 # Usuarios. El dueño ve todo; el empleado registra autos y trabajos, pero no ve
 # precios, costos ni el panel, no borra nada y no puede completar órdenes.
-NOMBRES_ROL = {"dueno": "Dueño", "empleado": "Empleado"}
+NOMBRES_ROL = {"dueno": "Dueño (administrador)", "empleado": "Empleado"}
 LARGO_MINIMO_CLAVE = 4
 # En el registro de actividad, lo hecho antes de esta hora es del turno mañana.
 HORA_CAMBIO_TURNO = 14
+# Acciones de producción: las que muestra Actividad y cuentan para el rendimiento.
+# Las administrativas (borrar, usuarios, lista de precios, copias) se guardan igual,
+# para saber quién borró algo, pero solo se ven al marcar "Incluir acciones administrativas".
+ACCIONES_PRODUCCION = (
+    "Creó la orden",
+    "Editó la orden",
+    "Cambió el estado",
+    "Registró un cliente",
+    "Agregó un vehículo",
+)
 NOMBRES_MES = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
 
 # Los importes se guardan como enteros en centavos para evitar errores de redondeo.
@@ -518,8 +528,8 @@ RUTAS_PUBLICAS = {"login", "configuracion_inicial", "static"}
 
 
 def pagina_de_inicio():
-    """El dueño empieza en el panel; el empleado, en las órdenes abiertas."""
-    return url_for("inicio") if es_dueno() else url_for("ordenes", estado="abiertas")
+    """El dueño empieza en el panel; el empleado, en las órdenes pendientes."""
+    return url_for("inicio") if es_dueno() else url_for("ordenes", estado="Pendiente")
 
 
 @app.before_request
@@ -609,8 +619,6 @@ def login():
         if fila is not None and check_password_hash(fila["clave_hash"], request.form.get("clave", "")):
             session.clear()
             session["usuario_id"] = fila["id"]
-            g.usuario = fila
-            registrar("Inició sesión")
             return redirect(pagina_de_inicio())
         error = "Usuario o contraseña incorrectos."
     return render_template("login.html", error=error, usuario_escrito=usuario_escrito)
@@ -618,7 +626,6 @@ def login():
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    registrar("Cerró sesión")
     session.clear()
     return redirect(url_for("login"))
 
@@ -691,26 +698,80 @@ def usuario_activar(usuario_id):
     return redirect(url_for("usuarios"))
 
 
+def leer_fecha(texto, por_defecto):
+    try:
+        return date.fromisoformat(texto or "")
+    except ValueError:
+        return por_defecto
+
+
+def rango_de_mes(meses_atras=0):
+    """Primer y último día de un mes (el actual termina hoy)."""
+    hoy = date.today()
+    anio, mes = divmod(hoy.year * 12 + hoy.month - 1 - meses_atras, 12)
+    inicio = date(anio, mes + 1, 1)
+    siguiente = date(anio + (mes == 11), (mes + 1) % 12 + 1, 1)
+    return inicio, min(siguiente - timedelta(days=1), hoy)
+
+
 @app.route("/actividad")
 @solo_dueno
 def actividad():
-    """Registro de quién hizo qué, filtrable por persona y por día."""
+    """Trabajo de cada persona en un período: métricas arriba y el detalle abajo."""
     usuario_id = request.args.get("usuario", type=int)
-    dia = request.args.get("fecha", "").strip()
-    condiciones, parametros = [], []
+    incluir_admin = request.args.get("todo") == "1"
+    inicio_mes, _ = rango_de_mes()
+    desde = leer_fecha(request.args.get("desde"), inicio_mes)  # Por defecto, el mes en curso.
+    hasta = leer_fecha(request.args.get("hasta"), date.today())
+    if desde > hasta:
+        desde, hasta = hasta, desde
+
+    marcadores = ", ".join("?" for _ in ACCIONES_PRODUCCION)
+    # Condiciones sobre la actividad: período y, salvo que se pida, solo producción.
+    periodo = ["substr(a.momento, 1, 10) >= ?", "substr(a.momento, 1, 10) <= ?"]
+    parametros_periodo = [desde.isoformat(), hasta.isoformat()]
+    produccion = periodo + [f"a.accion IN ({marcadores})"]
+    parametros_produccion = parametros_periodo + list(ACCIONES_PRODUCCION)
+
+    condiciones = list(produccion if not incluir_admin else periodo)
+    parametros = list(parametros_produccion if not incluir_admin else parametros_periodo)
     if usuario_id:
         condiciones.append("a.usuario_id = ?")
         parametros.append(usuario_id)
-    try:
-        date.fromisoformat(dia)
-    except ValueError:
-        dia = ""
-    if dia:
-        condiciones.append("substr(a.momento, 1, 10) = ?")
-        parametros.append(dia)
-    filtro = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    filtro = " WHERE " + " AND ".join(condiciones)
 
     db = get_db()
+    # Rendimiento por persona (siempre solo producción). Las personas activas aparecen
+    # aunque no hayan hecho nada en el período, para que también se vea un cero.
+    filtro_persona = " AND u.id = ?" if usuario_id else ""
+    rendimiento = db.execute(
+        f"""SELECT u.id, u.nombre, u.rol,
+                   COUNT(a.id) AS acciones,
+                   COALESCE(SUM(a.accion = 'Creó la orden'), 0) AS creadas,
+                   COUNT(DISTINCT a.orden_id) AS gestionadas,
+                   COALESCE(SUM(a.accion = 'Cambió el estado'), 0) AS cambios,
+                   COALESCE(SUM(a.accion = 'Registró un cliente'), 0) AS clientes
+            FROM usuarios u
+            LEFT JOIN actividad a ON a.usuario_id = u.id AND {" AND ".join(produccion)}
+            WHERE 1 = 1{filtro_persona}
+            GROUP BY u.id
+            HAVING u.activo = 1 OR COUNT(a.id) > 0
+            ORDER BY creadas DESC, gestionadas DESC, u.nombre COLLATE NOCASE""",
+        (*parametros_produccion, *([usuario_id] if usuario_id else [])),
+    ).fetchall()
+    # Órdenes distintas en total (una orden tocada por dos personas cuenta una vez).
+    gestionadas = db.execute(
+        f"""SELECT COUNT(DISTINCT a.orden_id) AS total FROM actividad a
+            WHERE {" AND ".join(produccion)}{" AND a.usuario_id = ?" if usuario_id else ""}""",
+        (*parametros_produccion, *([usuario_id] if usuario_id else [])),
+    ).fetchone()["total"]
+    metricas = {
+        "creadas": sum(fila["creadas"] for fila in rendimiento),
+        "gestionadas": gestionadas,
+        "cambios": sum(fila["cambios"] for fila in rendimiento),
+        "clientes": sum(fila["clientes"] for fila in rendimiento),
+    }
+
     total = db.execute("SELECT COUNT(*) AS total FROM actividad a" + filtro, parametros).fetchone()["total"]
     paginacion = paginar(total)
     filas = db.execute(
@@ -720,13 +781,23 @@ def actividad():
         + " ORDER BY a.momento DESC, a.id DESC LIMIT ? OFFSET ?",
         (*parametros, POR_PAGINA, paginacion["offset"]),
     ).fetchall()
-    personas = db.execute("SELECT id, nombre FROM usuarios ORDER BY nombre COLLATE NOCASE").fetchall()
+    personas = db.execute(
+        "SELECT id, nombre, rol FROM usuarios ORDER BY rol DESC, nombre COLLATE NOCASE"
+    ).fetchall()
+    persona = next((p for p in personas if p["id"] == usuario_id), None)
     return render_template(
         "actividad.html",
         registros=filas,
         personas=personas,
+        persona=persona,
         usuario_id=usuario_id,
-        dia=dia,
+        desde=desde,
+        hasta=hasta,
+        incluir_admin=incluir_admin,
+        rendimiento=rendimiento,
+        metricas=metricas,
+        este_mes=rango_de_mes(0),
+        mes_anterior=rango_de_mes(1),
         paginacion=paginacion,
     )
 

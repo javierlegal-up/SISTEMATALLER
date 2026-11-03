@@ -73,8 +73,11 @@
         {% endif %}
         {{ enlace_menu(url_for('ordenes', estado='Pendiente'), 'Pendientes', pantalla == 'ordenes' and vista == 'Pendiente', 'Pendiente') }}
         {{ enlace_menu(url_for('ordenes', estado='En Proceso'), 'En proceso', pantalla == 'ordenes' and vista == 'En Proceso', 'En Proceso') }}
-        {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado') }}
-        {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio')) }}
+        {# El empleado solo ve lo que tiene que trabajar; el historial completo es del dueño. #}
+        {% if es_dueno %}
+          {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado') }}
+          {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio')) }}
+        {% endif %}
         {{ enlace_menu(url_for('orden_nueva'), '+ Nueva orden', pantalla == 'orden_nueva') }}
       </div>
       <div class="space-y-1">
