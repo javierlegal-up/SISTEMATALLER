@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block titulo %}{{ cliente.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">{{ cliente.nombre }}</h1>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn-secundario" href="{{ url_for('cliente_editar', cliente_id=cliente.id) }}">Editar</a>
+      {% if es_dueno %}
+        <form method="post" action="{{ url_for('cliente_eliminar', cliente_id=cliente.id) }}" onsubmit="return confirm('¿Eliminar este cliente y sus vehículos?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn-peligro" type="submit">Eliminar</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="tarjeta mb-6">
+    <dl class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div><dt class="text-slate-500">Documento</dt><dd>{{ cliente.documento or '—' }}</dd></div>
+      <div><dt class="text-slate-500">Teléfono</dt><dd>{{ cliente.telefono or '—' }}</dd></div>
+      <div><dt class="text-slate-500">Email</dt><dd>{{ cliente.email or '—' }}</dd></div>
+      <div><dt class="text-slate-500">Dirección</dt><dd>{{ cliente.direccion or '—' }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="tarjeta mb-6">
+    <h2 class="mb-4 text-lg font-semibold">Vehículos</h2>
+    {% if vehiculos %}
+      <div class="mb-6 overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+            <tr>
+              <th class="py-2 pr-4">Patente</th>
+              <th class="py-2 pr-4">Vehículo</th>
+              <th class="py-2 pr-4">Año</th>
+              <th class="py-2 pr-4">Color</th>
+              <th class="py-2 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for v in vehiculos %}
+              <tr>
+                <td class="py-2 pr-4"><a class="enlace font-mono font-medium" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">{{ v.patente }}</a></td>
+                <td class="py-2 pr-4">{{ v.marca }} {{ v.modelo }}</td>
+                <td class="py-2 pr-4">{{ v.anio or '—' }}</td>
+                <td class="py-2 pr-4">{{ v.color or '—' }}</td>
+                <td class="py-2">
+                  <div class="flex items-center justify-end gap-3 whitespace-nowrap">
+                    <a class="enlace" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">Historial</a>
+                    <a class="enlace" href="{{ url_for('orden_nueva', vehiculo_id=v.id) }}">Nueva orden</a>
+                    <a class="enlace" href="{{ url_for('vehiculo_editar', vehiculo_id=v.id) }}">Editar</a>
+                    {% if es_dueno %}
+                      <form method="post" action="{{ url_for('vehiculo_eliminar', vehiculo_id=v.id) }}" onsubmit="return confirm('¿Eliminar este vehículo?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="text-red-700 hover:underline" type="submit">Eliminar</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="mb-6 text-sm text-slate-500">Este cliente no tiene vehículos.</p>
+    {% endif %}
+
+    <h3 class="mb-3 text-sm font-semibold">Agregar otro vehículo</h3>
+    <form method="post" action="{{ url_for('vehiculo_nuevo', cliente_id=cliente.id) }}" class="grid items-end gap-3 sm:grid-cols-6">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="etiqueta">Patente *<input class="campo font-mono uppercase" name="patente" maxlength="15" required autocomplete="off"></label>
+      <label class="etiqueta">Marca *<input class="campo" name="marca" required></label>
+      <label class="etiqueta">Modelo *<input class="campo" name="modelo" required></label>
+      <label class="etiqueta">Año<input class="campo" name="anio" inputmode="numeric" maxlength="4"></label>
+      <label class="etiqueta">Color<input class="campo" name="color"></label>
+      <button class="btn-primario" type="submit">Agregar</button>
+    </form>
+  </section>
+
+  <h2 class="mb-3 text-lg font-semibold">Órdenes de trabajo</h2>
+  {% include "_tabla_ordenes.html" %}
+{% endblock %}

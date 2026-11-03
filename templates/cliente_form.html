@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% block titulo %}{{ 'Editar cliente' if edicion else 'Registrar cliente' }}{% endblock %}
+
+{% macro fila_vehiculo(v) %}
+  <div class="fila-vehiculo grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-6">
+    <div class="sm:col-span-1">
+      <label class="etiqueta">Patente *<input class="campo font-mono uppercase" name="patente" value="{{ v.patente }}" maxlength="15" autocomplete="off"></label>
+    </div>
+    <div class="sm:col-span-1">
+      <label class="etiqueta">Marca *<input class="campo" name="marca" value="{{ v.marca }}"></label>
+    </div>
+    <div class="sm:col-span-1">
+      <label class="etiqueta">Modelo *<input class="campo" name="modelo" value="{{ v.modelo }}"></label>
+    </div>
+    <div class="sm:col-span-1">
+      <label class="etiqueta">Año<input class="campo" name="anio" value="{{ v.anio }}" inputmode="numeric" maxlength="4"></label>
+    </div>
+    <div class="sm:col-span-1">
+      <label class="etiqueta">Color<input class="campo" name="color" value="{{ v.color }}"></label>
+    </div>
+    <div class="flex items-end sm:col-span-1">
+      <button type="button" class="btn-peligro quitar-vehiculo w-full">Quitar</button>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block contenido %}
+  <h1 class="mb-6 text-2xl font-semibold">{{ 'Editar cliente' if edicion else 'Registrar cliente y vehículos' }}</h1>
+  {{ lista_errores(errores) }}
+
+  <form method="post" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <section class="tarjeta">
+      <h2 class="mb-4 text-lg font-semibold">Datos del cliente</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="etiqueta">Nombre completo *<input class="campo" name="nombre" value="{{ cliente.nombre }}" required></label>
+        <label class="etiqueta">Documento<input class="campo" name="documento" value="{{ cliente.documento }}"></label>
+        <label class="etiqueta">Teléfono<input class="campo" type="tel" name="telefono" value="{{ cliente.telefono }}"></label>
+        <label class="etiqueta">Email<input class="campo" type="email" name="email" value="{{ cliente.email }}"></label>
+        <label class="etiqueta sm:col-span-2">Dirección<input class="campo" name="direccion" value="{{ cliente.direccion }}"></label>
+      </div>
+    </section>
+
+    {% if not edicion %}
+      <section class="tarjeta">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold">Vehículos</h2>
+          <button type="button" id="agregar-vehiculo" class="btn-secundario">+ Agregar vehículo</button>
+        </div>
+        <div id="vehiculos" class="space-y-3">
+          {% for v in vehiculos %}{{ fila_vehiculo(v) }}{% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <div class="flex gap-2">
+      <button class="btn-primario" type="submit">Guardar</button>
+      <a class="btn-secundario" href="{{ url_for('cliente_detalle', cliente_id=cliente.id) if edicion else url_for('clientes') }}">Cancelar</a>
+    </div>
+  </form>
+
+  {% if not edicion %}
+    <template id="plantilla-vehiculo">{{ fila_vehiculo({}) }}</template>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {% if not edicion %}
+    <script>
+      const contenedor = document.getElementById("vehiculos");
+      const plantilla = document.getElementById("plantilla-vehiculo");
+
+      document.getElementById("agregar-vehiculo").addEventListener("click", () => {
+        contenedor.appendChild(plantilla.content.cloneNode(true));
+        contenedor.lastElementChild.querySelector("input").focus();
+      });
+
+      contenedor.addEventListener("click", (evento) => {
+        if (!evento.target.classList.contains("quitar-vehiculo")) return;
+        const fila = evento.target.closest(".fila-vehiculo");
+        if (contenedor.children.length > 1) {
+          fila.remove();
+        } else {
+          fila.querySelectorAll("input").forEach((campo) => { campo.value = ""; });
+        }
+      });
+    </script>
+  {% endif %}
+{% endblock %}

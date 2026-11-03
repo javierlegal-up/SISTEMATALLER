@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Clientes{% endblock %}
+{% block contenido %}
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">Clientes <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
+    <a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+  </div>
+
+  <form method="get" class="mb-4 flex gap-2">
+    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre, teléfono, documento o patente" aria-label="Buscar clientes">
+    <button class="btn-secundario" type="submit">Buscar</button>
+  </form>
+
+  {% if clientes %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Nombre</th>
+            <th class="px-4 py-3">Teléfono</th>
+            <th class="px-4 py-3">Documento</th>
+            <th class="px-4 py-3">Patentes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for c in clientes %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3"><a class="enlace font-medium" href="{{ url_for('cliente_detalle', cliente_id=c.id) }}">{{ c.nombre }}</a></td>
+              <td class="px-4 py-3">{{ c.telefono }}</td>
+              <td class="px-4 py-3">{{ c.documento }}</td>
+              <td class="px-4 py-3 font-mono">{{ c.patentes }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">No hay clientes para mostrar.</p>
+  {% endif %}
+{% endblock %}

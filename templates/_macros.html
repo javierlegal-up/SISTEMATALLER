@@ -1,0 +1,31 @@
+{% macro estado_badge(estado) %}
+  {% set colores = {
+    'Pendiente': 'bg-amber-100 text-amber-800',
+    'En Proceso': 'bg-blue-100 text-blue-800',
+    'Completado': 'bg-green-100 text-green-800'
+  } %}
+  <span class="inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium {{ colores.get(estado, 'bg-slate-100 text-slate-800') }}">{{ estado }}</span>
+{% endmacro %}
+
+{% macro paginacion_lista(p) %}
+  {% if p.paginas > 1 %}
+    <nav class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Paginación">
+      <p class="text-slate-500">Página {{ p.pagina }} de {{ p.paginas }} · {{ p.total }} en total</p>
+      <div class="flex gap-2">
+        {% if p.url_anterior %}<a class="btn-secundario" href="{{ p.url_anterior }}">← Anterior</a>{% endif %}
+        {% if p.url_siguiente %}<a class="btn-secundario" href="{{ p.url_siguiente }}">Siguiente →</a>{% endif %}
+      </div>
+    </nav>
+  {% endif %}
+{% endmacro %}
+
+{% macro lista_errores(errores) %}
+  {% if errores %}
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+      <p class="font-medium">Corrige lo siguiente:</p>
+      <ul class="mt-1 list-inside list-disc">
+        {% for error in errores %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endmacro %}

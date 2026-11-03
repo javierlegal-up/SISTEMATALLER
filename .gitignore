@@ -1,0 +1,14 @@
+# NUNCA subir a GitHub: datos reales de clientes y claves.
+taller.db
+taller.db-journal
+*.db
+*.db-journal
+*.tmp
+respaldos/
+simulacion_datos/
+.secret_key
+
+# Entorno de Python y archivos generados.
+venv/
+__pycache__/
+*.pyc

@@ -1,0 +1,7 @@
+<a href="{{ url_for('orden_detalle', orden_id=o.id) }}" class="block rounded-lg border border-red-200 p-2.5 text-sm transition hover:bg-red-50">
+  <div class="flex items-center justify-between gap-2">
+    <span class="font-semibold text-blue-700">{{ o.id|num_ot }}</span>
+    <span class="whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">{{ o.dias }} días</span>
+  </div>
+  <p class="mt-1 truncate text-slate-700">{{ o.cliente_nombre }} · <span class="font-mono">{{ o.patente }}</span></p>
+</a>

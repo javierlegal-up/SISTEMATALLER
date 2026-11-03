@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block titulo %}Panel{% endblock %}
+{% set mes_actual = resumen.meses[-1] %}
+{% set mes_anterior = resumen.meses[-2] %}
+{% block contenido %}
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">Panel del taller</h1>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn-secundario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+      <a class="btn-primario" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
+    </div>
+  </div>
+
+  <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <a class="tarjeta border-t-4 border-t-red-600 transition-shadow duration-150 hover:shadow-md hover:shadow-red-600/20" href="{{ url_for('ordenes', estado='abiertas') }}">
+      <p class="text-sm text-slate-500">Órdenes abiertas</p>
+      <p class="mt-1 text-3xl font-semibold">{{ resumen.abiertas }}</p>
+      <p class="mt-1 text-xs text-slate-500">Ver la lista →</p>
+    </a>
+    <a class="tarjeta border-t-4 border-t-red-600 transition-shadow duration-150 hover:shadow-md hover:shadow-red-600/20 {{ 'ring-1 ring-red-500/50' if resumen.atrasadas }}" href="{{ url_for('ordenes', estado='atrasadas') }}">
+      <p class="text-sm text-slate-500">Atrasadas <span class="text-xs">(más de {{ dias_atraso }} días)</span></p>
+      <p class="mt-1 text-3xl font-semibold {{ 'text-red-700' if resumen.atrasadas }}">{{ resumen.atrasadas }}</p>
+      <p class="mt-1 text-xs text-slate-500">Ver la lista →</p>
+    </a>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">Valor del trabajo en curso</p>
+      <p class="mt-1 text-2xl font-semibold xl:text-3xl">{{ resumen.valor_abierto|dinero }}</p>
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">Completado este mes</p>
+      <p class="mt-1 text-2xl font-semibold xl:text-3xl">{{ (mes_actual.repuestos + mes_actual.mano_obra)|dinero }}</p>
+      <p class="mt-1 text-xs text-slate-500">Mes anterior: {{ (mes_anterior.repuestos + mes_anterior.mano_obra)|dinero }}</p>
+    </div>
+  </div>
+
+  <div class="grid gap-5 lg:grid-cols-3">
+    <section class="tarjeta lg:col-span-2">
+      <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="font-semibold">Trabajo completado por mes</h2>
+          <p class="text-xs text-slate-500">Pasa el cursor o haz clic en un mes.</p>
+        </div>
+        <div class="flex gap-4 text-xs text-slate-600">
+          <span><span class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-red-600"></span>Mano de obra</span>
+          <span><span class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-neutral-500"></span>Repuestos</span>
+        </div>
+      </div>
+      <div id="grafico" class="flex h-36 items-end gap-2 sm:gap-4"></div>
+      <p id="grafico-detalle" class="mt-3 rounded-lg bg-slate-50 p-2.5 text-sm" aria-live="polite"></p>
+    </section>
+
+    <section class="tarjeta">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <h2 class="font-semibold">Requieren atención</h2>
+        {% if resumen.atrasadas %}<a class="enlace text-xs" href="{{ url_for('ordenes', estado='atrasadas') }}">Ver todas</a>{% endif %}
+      </div>
+      <div class="space-y-2">
+        {% for o in atrasadas %}
+          {% include "_tarjeta_orden.html" %}
+        {% else %}
+          <p class="py-6 text-center text-sm text-slate-500">No hay órdenes atrasadas.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <section class="tarjeta mt-5 text-sm">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="font-semibold">Copias de seguridad</h2>
+      <form method="post" action="{{ url_for('respaldo_ahora') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn-secundario" type="submit">Hacer copia ahora</button>
+      </form>
+    </div>
+
+    {% if not respaldo_ok %}
+      <p class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800" role="alert">
+        No se pudo crear la copia de seguridad de hoy. Revisa la carpeta de respaldos y copia <code>taller.db</code> a un lugar seguro.
+      </p>
+    {% endif %}
+
+    <dl class="grid gap-2 sm:grid-cols-2">
+      <div><dt class="text-slate-500">En esta compu</dt><dd class="font-medium">{{ ultimo_respaldo|fecha or 'Ninguna' }}</dd></div>
+      <div><dt class="text-slate-500">Fuera de la compu (pendrive o nube)</dt><dd class="font-medium">{{ copia_externa or 'Nunca' }}</dd></div>
+    </dl>
+
+    {% if aviso_copia_externa %}
+      <p class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950" role="alert">
+        {% if copia_externa %}Hace más de {{ dias_aviso_copia_externa }} días que no hay una copia fuera de la compu.{% else %}Todavía no hay ninguna copia fuera de la compu.{% endif %}
+        Si se rompe el disco, se perdería todo. Conecta el pendrive (con la carpeta <strong>{{ carpeta_pendrive }}</strong>) y pulsa <strong>Hacer copia ahora</strong>.
+      </p>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const MESES = {{ resumen.meses|tojson }};
+    const moneda = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dinero = (centavos) => "$" + moneda.format(centavos / 100);
+    const totalMes = (mes) => mes.repuestos + mes.mano_obra;
+    const grafico = document.getElementById("grafico");
+    const maximo = Math.max(...MESES.map(totalMes), 1);
+
+    function mostrarMes(indice) {
+      const mes = MESES[indice];
+      document.getElementById("grafico-detalle").textContent =
+        `${mes.etiqueta}: ${dinero(totalMes(mes))} en ${mes.ordenes} ${mes.ordenes === 1 ? "orden" : "órdenes"} ` +
+        `(mano de obra ${dinero(mes.mano_obra)}, repuestos ${dinero(mes.repuestos)})`;
+      grafico.querySelectorAll("button").forEach((barra, posicion) => {
+        barra.classList.toggle("bg-slate-100", posicion === indice);
+      });
+    }
+
+    MESES.forEach((mes, indice) => {
+      const barra = document.createElement("button");
+      barra.type = "button";
+      barra.className = "flex h-full flex-1 flex-col justify-end rounded-lg px-1 transition hover:bg-slate-100";
+      barra.setAttribute("aria-label", `${mes.etiqueta}: ${dinero(totalMes(mes))}`);
+
+      const pila = document.createElement("div");
+      pila.className = "flex min-h-0 flex-1 flex-col justify-end overflow-hidden";
+      [[mes.repuestos, "bg-neutral-500"], [mes.mano_obra, "bg-red-600"]].forEach(([valor, color]) => {
+        const tramo = document.createElement("div");
+        tramo.className = "w-full " + color;
+        tramo.style.height = (valor / maximo * 100) + "%";
+        pila.appendChild(tramo);
+      });
+
+      const etiqueta = document.createElement("span");
+      etiqueta.className = "mt-1 block text-center text-xs text-slate-600";
+      etiqueta.textContent = mes.etiqueta.split(" ")[0];
+
+      barra.append(pila, etiqueta);
+      ["mouseenter", "focus", "click"].forEach((evento) => {
+        barra.addEventListener(evento, () => mostrarMes(indice));
+      });
+      grafico.appendChild(barra);
+    });
+    mostrarMes(MESES.length - 1);
+  </script>
+{% endblock %}

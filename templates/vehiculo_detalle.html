@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import estado_badge, paginacion_lista %}
+{% block titulo %}{{ vehiculo.patente }}{% endblock %}
+{% block contenido %}
+  <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-semibold"><span class="font-mono">{{ vehiculo.patente }}</span> · {{ vehiculo.marca }} {{ vehiculo.modelo }}{% if vehiculo.anio %} ({{ vehiculo.anio }}){% endif %}</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        Cliente: <a class="enlace" href="{{ url_for('cliente_detalle', cliente_id=vehiculo.cliente_id) }}">{{ vehiculo.cliente_nombre }}</a>
+        {% if vehiculo.cliente_telefono %}· {{ vehiculo.cliente_telefono }}{% endif %}
+        {% if vehiculo.color %}· {{ vehiculo.color }}{% endif %}
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn-secundario" href="{{ url_for('vehiculo_editar', vehiculo_id=vehiculo.id) }}">Editar</a>
+      <a class="btn-primario" href="{{ url_for('orden_nueva', vehiculo_id=vehiculo.id) }}">Nueva orden</a>
+    </div>
+  </div>
+
+  {# Los importes y la ganancia solo los ve el dueño. #}
+  {% if es_dueno %}
+  <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">Total de trabajos completados</p>
+      <p class="mt-1 text-2xl font-semibold">{{ (totales.repuestos + totales.mano_obra)|dinero }}</p>
+      <p class="mt-1 text-xs text-slate-500">{{ totales.ordenes }} {{ 'orden' if totales.ordenes == 1 else 'órdenes' }} en total</p>
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">En repuestos</p>
+      <p class="mt-1 text-2xl font-semibold">{{ totales.repuestos|dinero }}</p>
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">En mano de obra</p>
+      <p class="mt-1 text-2xl font-semibold">{{ totales.mano_obra|dinero }}</p>
+    </div>
+    <div class="tarjeta border-dashed">
+      <p class="text-sm text-slate-500">Ganancia estimada</p>
+      <p class="mt-1 text-2xl font-semibold">{{ (totales.repuestos + totales.mano_obra - totales.costo)|dinero }}</p>
+      <p class="mt-1 text-xs text-slate-500">Tu costo: {{ totales.costo|dinero }}</p>
+      {% if totales.sin_costo %}
+        <p class="mt-1 text-xs text-amber-700">{{ totales.sin_costo }} {{ 'repuesto' if totales.sin_costo == 1 else 'repuestos' }} sin costo cargado</p>
+      {% endif %}
+    </div>
+    <div class="tarjeta">
+      <p class="text-sm text-slate-500">En órdenes sin terminar</p>
+      <p class="mt-1 text-2xl font-semibold">{{ totales.en_curso|dinero }}</p>
+      <p class="mt-1 text-xs text-slate-500">No se suma al total</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <h2 class="mb-3 text-lg font-semibold">Lo que se le hizo a este vehículo</h2>
+  {% if lineas %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Fecha</th>
+            <th class="px-4 py-3">Orden</th>
+            <th class="px-4 py-3">Tipo</th>
+            <th class="px-4 py-3">Descripción</th>
+            <th class="px-4 py-3 text-right">Cant.</th>
+            {% if es_dueno %}
+              <th class="px-4 py-3 text-right">Precio unit.</th>
+              <th class="px-4 py-3 text-right">Subtotal</th>
+              <th class="px-4 py-3 text-right text-slate-400">Tu costo</th>
+            {% endif %}
+            <th class="px-4 py-3">Estado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for l in lineas %}
+            <tr class="hover:bg-slate-50">
+              <td class="whitespace-nowrap px-4 py-3">{{ l.fecha_trabajo|fecha }}</td>
+              <td class="whitespace-nowrap px-4 py-3"><a class="enlace" href="{{ url_for('orden_detalle', orden_id=l.orden_id) }}">{{ l.orden_id|num_ot }}</a></td>
+              <td class="px-4 py-3">{{ 'Mano de obra' if l.tipo == 'Servicio' else l.tipo }}</td>
+              <td class="px-4 py-3">{{ l.descripcion }}{% if l.del_cliente %} <span class="text-xs text-slate-500">(lo trajo el cliente)</span>{% endif %}</td>
+              <td class="px-4 py-3 text-right">{{ l.cantidad|cantidad }}</td>
+              {% if es_dueno %}
+                <td class="whitespace-nowrap px-4 py-3 text-right">{{ 'Falta precio' if l.falta_precio else l.precio_unitario_centavos|dinero }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-medium">{{ '—' if l.falta_precio else l.subtotal_centavos|dinero }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right text-slate-500">{{ l.costo_total_centavos|dinero if l.costo_total_centavos is not none else '—' }}</td>
+              {% endif %}
+              <td class="px-4 py-3">{{ estado_badge(l.estado) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">Todavía no se cargaron repuestos ni mano de obra para este vehículo.</p>
+  {% endif %}
+{% endblock %}

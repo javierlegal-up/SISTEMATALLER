@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% block titulo %}{{ 'Editar orden' if orden_id else 'Nueva orden' }}{% endblock %}
+
+{# Repuestos y mano de obra van en tablas separadas. Las dos envían los mismos campos
+   (item_id, item_tipo, item_descripcion, item_cantidad, item_cliente y, solo el dueño,
+   item_precio e item_costo), así que el servidor las lee igual.
+   "Servicio" es el valor interno de la mano de obra.
+   El empleado no ve ni envía precios: anota qué se hizo y el dueño pone los precios después.
+   Un precio vacío significa "falta poner precio" (la línea se resalta en amarillo). #}
+
+{% macro aviso_sin_precio(l) %}
+  {% if es_dueno and l.falta_precio %}<span class="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Falta precio · lo anotó un empleado</span>{% endif %}
+{% endmacro %}
+
+{% macro fila_repuesto(l) %}
+  <tr class="fila-linea align-top {{ 'bg-amber-50' if es_dueno and l.falta_precio }}" data-tipo="Repuesto">
+    <td class="py-1 pr-2">
+      <input type="hidden" name="item_id" value="{{ l.item_id }}">
+      <input type="hidden" name="item_tipo" value="Repuesto">
+      <input type="hidden" class="linea-cliente-valor" name="item_cliente" value="{{ '1' if l.del_cliente else '0' }}">
+      <input class="campo !mt-0 linea-descripcion min-w-48" name="item_descripcion" value="{{ l.descripcion }}" list="lista-repuestos" placeholder="Ej.: Aceite sintético 5W40" aria-label="Repuesto" autocomplete="off">
+      {{ aviso_sin_precio(l) }}
+    </td>
+    <td class="py-1 pr-2"><input class="campo !mt-0 linea-cantidad w-20" type="number" name="item_cantidad" value="{{ l.cantidad or '1' }}" min="0.01" step="0.01" aria-label="Cantidad"></td>
+    {% if es_dueno %}
+      <td class="py-1 pr-2"><input class="campo !mt-0 linea-precio w-28 {{ 'bg-slate-100' if l.del_cliente }}" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente, por unidad" {{ 'readonly' if l.del_cliente }}></td>
+      <td class="py-1 pr-2"><input class="campo !mt-0 linea-costo w-28 {{ 'bg-slate-100' if l.del_cliente else 'bg-slate-50' }}" type="number" name="item_costo" value="{{ l.costo }}" min="0" step="0.01" placeholder="Opcional" aria-label="Te costó a ti, por unidad" {{ 'readonly' if l.del_cliente }}></td>
+    {% endif %}
+    <td class="py-3 pr-2"><label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600"><input type="checkbox" class="linea-cliente h-4 w-4" {{ 'checked' if l.del_cliente }}>Lo trae el cliente</label></td>
+    {% if es_dueno %}<td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right">$0,00</td>{% endif %}
+    <td class="py-1 text-right"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar repuesto">✕</button></td>
+  </tr>
+{% endmacro %}
+
+{% macro fila_mano_obra(l) %}
+  <tr class="fila-linea align-top {{ 'bg-amber-50' if es_dueno and l.falta_precio }}" data-tipo="Servicio">
+    <td class="py-1 pr-2">
+      <input type="hidden" name="item_id" value="{{ l.item_id }}">
+      <input type="hidden" name="item_tipo" value="Servicio">
+      <input type="hidden" name="item_cliente" value="0">
+      {# La cantidad y el costo no se piden para la mano de obra, pero se conservan si ya existían. #}
+      <input type="hidden" class="linea-cantidad" name="item_cantidad" value="{{ l.cantidad or '1' }}">
+      {% if es_dueno %}<input type="hidden" class="linea-costo" name="item_costo" value="{{ l.costo }}">{% endif %}
+      <input class="campo !mt-0 linea-descripcion min-w-48" name="item_descripcion" value="{{ l.descripcion }}" list="lista-mano-obra" placeholder="Ej.: Cambio de pastillas" aria-label="Trabajo realizado" autocomplete="off">
+      {{ aviso_sin_precio(l) }}
+    </td>
+    {% if es_dueno %}
+      <td class="py-1 pr-2"><input class="campo !mt-0 linea-precio w-32" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente"></td>
+      <td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right">$0,00</td>
+    {% endif %}
+    <td class="py-1 text-right"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar trabajo">✕</button></td>
+  </tr>
+{% endmacro %}
+
+{% block contenido %}
+  <h1 class="mb-6 text-2xl font-semibold">{{ 'Editar orden ' ~ (orden_id|num_ot) if orden_id else 'Nueva orden de trabajo' }}</h1>
+  {{ lista_errores(errores) }}
+
+  {% if not clientes %}
+    <div class="tarjeta text-sm">
+      <p class="mb-3">Para crear una orden primero necesitas un cliente con al menos un vehículo.</p>
+      <a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+    </div>
+  {% else %}
+    <form method="post" class="space-y-6" data-vehiculo="{{ orden.vehiculo_id or '' }}" id="form-orden">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <section class="tarjeta">
+        <h2 class="mb-4 text-lg font-semibold">1. Cliente y vehículo</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="etiqueta">Cliente *
+            <select class="campo" id="cliente" required>
+              <option value="">Selecciona un cliente</option>
+              {% for c in clientes %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="etiqueta">Vehículo *
+            <select class="campo" id="vehiculo" name="vehiculo_id" required>
+              <option value="">Selecciona primero un cliente</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="tarjeta">
+        <h2 class="mb-4 text-lg font-semibold">2. Reparación</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
+          <label class="etiqueta">Estado *
+            <select class="campo" name="estado">
+              {# Solo el dueño completa órdenes (pone los precios y entrega el auto). #}
+              {% for e in ESTADOS if es_dueno or e != 'Completado' %}<option value="{{ e }}" {{ 'selected' if orden.estado == e }}>{{ e }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="etiqueta">Fecha de ingreso *<input class="campo" type="date" name="fecha_ingreso" value="{{ orden.fecha_ingreso }}" required></label>
+          <label class="etiqueta">Kilometraje<input class="campo" type="number" name="kilometraje" value="{{ orden.kilometraje }}" min="0" step="1"></label>
+          <label class="etiqueta sm:col-span-3">Fallas reportadas *<textarea class="campo" name="fallas" rows="3" required>{{ orden.fallas }}</textarea></label>
+          <label class="etiqueta sm:col-span-3">Diagnóstico / trabajo realizado<textarea class="campo" name="diagnostico" rows="3">{{ orden.diagnostico }}</textarea></label>
+          <label class="etiqueta sm:col-span-3">Notas para el cliente<textarea class="campo" name="notas" rows="2">{{ orden.notas }}</textarea></label>
+        </div>
+      </section>
+
+      <section class="tarjeta space-y-8" id="seccion-lineas">
+        <div>
+          <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold">3. Repuestos</h2>
+              <p class="text-sm text-slate-500">
+                {% if es_dueno %}Anota lo que le cobras al cliente y lo que te costó a ti. Deja el precio vacío si todavía no lo sabes.{% else %}Anota qué repuestos se usaron y cuántos. Los precios los pone el dueño.{% endif %}
+                Si el cliente trae el repuesto, marca <strong>Lo trae el cliente</strong>.
+              </p>
+            </div>
+            <button type="button" class="btn-secundario" data-agregar="Repuesto">+ Agregar repuesto</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-2 pr-2">Repuesto</th>
+                  <th class="py-2 pr-2">Cant.</th>
+                  {% if es_dueno %}
+                    <th class="py-2 pr-2" title="Lo que se le cobra al cliente por unidad">Precio unit. al cliente ($)</th>
+                    <th class="py-2 pr-2" title="Lo que te cuesta a ti comprarlo. No aparece en el comprobante del cliente">Tu costo unit. ($)</th>
+                  {% endif %}
+                  <th class="py-2 pr-2"></th>
+                  {% if es_dueno %}<th class="py-2 pr-2 text-right">Subtotal</th>{% endif %}
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-lineas="Repuesto">
+                {% for l in lineas if l.tipo == 'Repuesto' %}{{ fila_repuesto(l) }}{% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="sin-lineas py-3 text-sm text-slate-400" data-vacio="Repuesto">Sin repuestos.</p>
+        </div>
+
+        <div>
+          <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold">4. Mano de obra</h2>
+              <p class="text-sm text-slate-500">{% if es_dueno %}Anota cada trabajo y lo que le cobras por él. Es tu trabajo: todo cuenta como ganancia.{% else %}Anota cada trabajo que hiciste, por ejemplo "Cambio de cámara". El precio lo pone el dueño.{% endif %}</p>
+            </div>
+            <button type="button" class="btn-secundario" data-agregar="Servicio">+ Agregar mano de obra</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-2 pr-2">Trabajo</th>
+                  {% if es_dueno %}
+                    <th class="py-2 pr-2">Precio al cliente ($)</th>
+                    <th class="py-2 pr-2 text-right">Subtotal</th>
+                  {% endif %}
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-lineas="Servicio">
+                {% for l in lineas if l.tipo != 'Repuesto' %}{{ fila_mano_obra(l) }}{% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="sin-lineas py-3 text-sm text-slate-400" data-vacio="Servicio">Sin mano de obra.</p>
+        </div>
+
+        <datalist id="lista-repuestos">
+          {% for item in catalogo if item.tipo == 'Repuesto' %}<option value="{{ item.nombre }}"></option>{% endfor %}
+        </datalist>
+        <datalist id="lista-mano-obra">
+          {% for item in catalogo if item.tipo == 'Servicio' %}<option value="{{ item.nombre }}"></option>{% endfor %}
+        </datalist>
+
+        {% if es_dueno %}
+        <dl class="ml-auto max-w-sm space-y-1 rounded-xl border border-neutral-200 border-t-4 border-t-red-600 bg-white p-4 text-sm shadow-sm">
+          <div class="flex justify-between"><dt>Total repuestos</dt><dd id="total-repuestos">$0,00</dd></div>
+          <div class="flex justify-between"><dt>Total mano de obra</dt><dd id="total-mano-obra">$0,00</dd></div>
+          <div class="flex items-baseline justify-between border-t border-slate-300 pt-2 text-base font-bold"><dt>Total a cobrar al cliente</dt><dd id="total-general" class="text-xl text-red-600">$0,00</dd></div>
+          <div class="mt-2 flex justify-between gap-4 border-t border-dashed border-slate-300 pt-2 text-slate-600"><dt>Tu costo total <span class="text-xs">(interno, no se imprime)</span></dt><dd id="total-costo" class="whitespace-nowrap">$0,00</dd></div>
+          <div class="flex justify-between font-semibold text-green-700"><dt>Ganancia neta estimada</dt><dd id="total-ganancia">$0,00</dd></div>
+          <p id="aviso-sin-precio" class="hidden pt-1 text-xs text-amber-700">Hay líneas sin precio: no se suman hasta que les pongas uno.</p>
+        </dl>
+        {% endif %}
+      </section>
+
+      <div class="flex gap-2">
+        <button class="btn-primario" type="submit">Guardar orden</button>
+        <a class="btn-secundario" href="{{ url_for('orden_detalle', orden_id=orden_id) if orden_id else url_for('ordenes') }}">Cancelar</a>
+      </div>
+    </form>
+
+    <template id="plantilla-Repuesto">{{ fila_repuesto({}) }}</template>
+    <template id="plantilla-Servicio">{{ fila_mano_obra({}) }}</template>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {% if clientes %}
+    <script>
+      const VEHICULOS = {{ vehiculos|tojson }};
+      const CATALOGO = {{ catalogo|tojson }};
+
+      // --- Cliente y vehículo dependientes ---
+      const selectCliente = document.getElementById("cliente");
+      const selectVehiculo = document.getElementById("vehiculo");
+
+      function cargarVehiculos(clienteId, vehiculoId) {
+        const propios = VEHICULOS.filter((v) => String(v.cliente_id) === String(clienteId));
+        selectVehiculo.replaceChildren(new Option(clienteId ? "Selecciona un vehículo" : "Selecciona primero un cliente", ""));
+        propios.forEach((v) => selectVehiculo.add(new Option(v.texto, v.id)));
+        if (vehiculoId) {
+          selectVehiculo.value = String(vehiculoId);
+        } else if (propios.length === 1) {
+          selectVehiculo.value = String(propios[0].id);
+        }
+      }
+
+      selectCliente.addEventListener("change", () => cargarVehiculos(selectCliente.value));
+
+      const vehiculoInicial = VEHICULOS.find(
+        (v) => String(v.id) === document.getElementById("form-orden").dataset.vehiculo
+      );
+      if (vehiculoInicial) {
+        selectCliente.value = String(vehiculoInicial.cliente_id);
+        cargarVehiculos(vehiculoInicial.cliente_id, vehiculoInicial.id);
+      }
+
+      // --- Repuestos, mano de obra y totales ---
+      const seccion = document.getElementById("seccion-lineas");
+      const moneda = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatear = (valor) => "$" + moneda.format(valor);
+      const numero = (campo) => parseFloat(campo.value) || 0;
+
+      // El empleado no tiene campos de precio ni recuadro de totales: solo se calcula para el dueño.
+      const hayTotales = document.getElementById("total-general") !== null;
+
+      function recalcular() {
+        // Muestra "Sin repuestos" / "Sin mano de obra" cuando la tabla está vacía.
+        seccion.querySelectorAll("[data-vacio]").forEach((aviso) => {
+          const tabla = seccion.querySelector(`[data-lineas="${aviso.dataset.vacio}"]`);
+          aviso.classList.toggle("hidden", tabla.children.length > 0);
+        });
+        if (!hayTotales) return;
+
+        const totales = { Repuesto: 0, Servicio: 0 };
+        let costoTotal = 0;
+        let sinPrecio = false;
+        seccion.querySelectorAll(".fila-linea").forEach((fila) => {
+          const cantidad = numero(fila.querySelector(".linea-cantidad"));
+          const precio = fila.querySelector(".linea-precio");
+          const subtotal = cantidad * numero(precio);
+          fila.querySelector(".linea-subtotal").textContent = formatear(subtotal);
+          totales[fila.dataset.tipo] += subtotal;
+          costoTotal += cantidad * numero(fila.querySelector(".linea-costo"));
+          const delCliente = fila.querySelector(".linea-cliente-valor")?.value === "1";
+          if (precio.value.trim() === "" && !delCliente) sinPrecio = true;
+        });
+        const total = totales.Repuesto + totales.Servicio;
+        document.getElementById("total-repuestos").textContent = formatear(totales.Repuesto);
+        document.getElementById("total-mano-obra").textContent = formatear(totales.Servicio);
+        document.getElementById("total-general").textContent = formatear(total);
+        document.getElementById("total-costo").textContent = formatear(costoTotal);
+        document.getElementById("total-ganancia").textContent = formatear(total - costoTotal);
+        document.getElementById("aviso-sin-precio").classList.toggle("hidden", !sinPrecio);
+      }
+
+      // Un repuesto que trae el cliente no se cobra ni tiene costo para el taller.
+      function marcarDelCliente(fila, marcado) {
+        fila.querySelector(".linea-cliente-valor").value = marcado ? "1" : "0";
+        const precio = fila.querySelector(".linea-precio");
+        const costo = fila.querySelector(".linea-costo");
+        if (!precio) return;  // Empleado: no hay campos de precio.
+        [precio, costo].forEach((campo) => {
+          campo.readOnly = marcado;
+          campo.classList.toggle("bg-slate-100", marcado);
+        });
+        if (marcado) {
+          precio.value = "0";
+          costo.value = "";
+        } else if (numero(precio) === 0) {
+          precio.value = "";
+        }
+      }
+
+      seccion.addEventListener("click", (evento) => {
+        const botonAgregar = evento.target.closest("[data-agregar]");
+        if (botonAgregar) {
+          const tipo = botonAgregar.dataset.agregar;
+          const tabla = seccion.querySelector(`[data-lineas="${tipo}"]`);
+          tabla.appendChild(document.getElementById(`plantilla-${tipo}`).content.cloneNode(true));
+          tabla.lastElementChild.querySelector(".linea-descripcion").focus();
+          recalcular();
+        } else if (evento.target.closest(".quitar-linea")) {
+          evento.target.closest(".fila-linea").remove();
+          recalcular();
+        }
+      });
+
+      seccion.addEventListener("input", (evento) => {
+        const fila = evento.target.closest(".fila-linea");
+        if (fila && evento.target.classList.contains("linea-descripcion")) {
+          // Si se elige algo de la lista de precios, se completan precio y costo (siguen editables).
+          const item = CATALOGO.find((c) => c.nombre === evento.target.value && c.tipo === fila.dataset.tipo);
+          const delCliente = fila.querySelector(".linea-cliente")?.checked;
+          if (item && !delCliente && fila.querySelector(".linea-precio")) {
+            fila.querySelector(".linea-precio").value = item.precio;
+            if (fila.dataset.tipo === "Repuesto") fila.querySelector(".linea-costo").value = item.costo;
+          }
+        }
+        recalcular();
+      });
+
+      seccion.addEventListener("change", (evento) => {
+        if (evento.target.classList.contains("linea-cliente")) {
+          marcarDelCliente(evento.target.closest(".fila-linea"), evento.target.checked);
+        }
+        recalcular();
+      });
+
+      recalcular();
+    </script>
+  {% endif %}
+{% endblock %}

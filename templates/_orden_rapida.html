@@ -1,0 +1,54 @@
+{% from "_macros.html" import estado_badge %}
+<div class="max-h-[85vh] overflow-y-auto p-5 text-sm">
+  <div class="mb-4 flex items-start justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <h2 class="text-lg font-semibold">{{ orden.id|num_ot }}</h2>
+      {{ estado_badge(orden.estado) }}
+    </div>
+    <button type="button" class="cerrar-ventana rounded px-2 py-1 text-slate-500 hover:bg-slate-100" aria-label="Cerrar">✕</button>
+  </div>
+
+  <div class="mb-4 grid grid-cols-2 gap-4">
+    <div>
+      <p class="text-xs uppercase text-slate-500">Cliente</p>
+      <p class="font-medium">{{ orden.cliente_nombre }}</p>
+      {% if orden.cliente_telefono %}<a class="enlace" href="tel:{{ orden.cliente_telefono }}">{{ orden.cliente_telefono }}</a>{% endif %}
+    </div>
+    <div>
+      <p class="text-xs uppercase text-slate-500">Vehículo</p>
+      <a class="enlace font-mono font-medium" href="{{ url_for('vehiculo_detalle', vehiculo_id=orden.vehiculo_id) }}">{{ orden.patente }}</a>
+      <p class="text-slate-600">{{ orden.marca }} {{ orden.modelo }}</p>
+    </div>
+  </div>
+
+  <p class="text-xs uppercase text-slate-500">Fallas reportadas</p>
+  <p class="mb-4 whitespace-pre-line">{{ orden.fallas }}</p>
+
+  {% if items %}
+    <ul class="mb-3 divide-y divide-slate-100 border-y border-slate-100">
+      {% for i in items %}
+        <li class="flex justify-between gap-3 py-1.5">
+          <span>{{ i.cantidad|cantidad }} × {{ i.descripcion }}{% if i.del_cliente %} <span class="text-xs text-slate-500">(lo trajo el cliente)</span>{% endif %}</span>
+          {% if es_dueno %}
+            <span class="whitespace-nowrap">{{ 'Falta precio' if i.falta_precio else i.subtotal_centavos|dinero }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if es_dueno %}
+    <p class="mb-5 flex justify-between text-base font-semibold">
+      <span>Total</span><span>{{ (orden.total_repuestos + orden.total_mano_obra)|dinero }}</span>
+    </p>
+  {% endif %}
+
+  <div class="mt-4 flex flex-wrap gap-2">
+    <a class="btn-primario" href="{{ url_for('orden_detalle', orden_id=orden.id) }}">Ver completa</a>
+    {% if es_dueno or orden.estado != 'Completado' %}
+      <a class="btn-secundario" href="{{ url_for('orden_editar', orden_id=orden.id) }}">Editar</a>
+    {% endif %}
+    {% if es_dueno %}
+      <a class="btn-secundario" href="{{ url_for('orden_imprimir', orden_id=orden.id) }}" target="_blank" rel="noopener">Imprimir / PDF</a>
+    {% endif %}
+  </div>
+</div>

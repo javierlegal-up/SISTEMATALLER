@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores, paginacion_lista %}
+{% block titulo %}Lista de precios{% endblock %}
+{% block contenido %}
+  <h1 class="text-2xl font-semibold">Lista de precios</h1>
+  <p class="mb-5 mt-1 text-sm text-slate-500">
+    Lista general de repuestos y servicios, para completar las órdenes más rápido. No está asociada a ningún auto.
+    Para ver lo que se le hizo a cada uno, entra a <a class="enlace" href="{{ url_for('vehiculos') }}">Vehículos</a>.
+  </p>
+  {{ lista_errores(errores) }}
+
+  <form method="post" action="{{ url_for('catalogo', editar=editar_id) if editar_id else url_for('catalogo') }}" class="tarjeta mb-6 grid items-end gap-4 sm:grid-cols-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="etiqueta">Tipo
+      <select class="campo" name="tipo">
+        {% for t in TIPOS %}<option value="{{ t }}" {{ 'selected' if item.tipo == t }}>{{ 'Mano de obra' if t == 'Servicio' else t }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="etiqueta sm:col-span-2">Nombre *<input class="campo" name="nombre" value="{{ item.nombre }}" required></label>
+    <label class="etiqueta">Precio *<input class="campo" type="number" name="precio" value="{{ item.precio }}" min="0" step="0.01" required></label>
+    <label class="etiqueta" title="Lo que te cuesta a ti. No aparece en el comprobante.">Tu costo <span class="font-normal text-slate-400">(opcional)</span><input class="campo" type="number" name="costo" value="{{ item.costo }}" min="0" step="0.01"></label>
+    <div class="flex gap-2">
+      <button class="btn-primario flex-1" type="submit">{{ 'Guardar' if editar_id else 'Agregar' }}</button>
+      {% if editar_id %}<a class="btn-secundario" href="{{ url_for('catalogo') }}">Cancelar</a>{% endif %}
+    </div>
+  </form>
+
+  {% if catalogo %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Tipo</th>
+            <th class="px-4 py-3">Nombre</th>
+            <th class="px-4 py-3 text-right">Precio</th>
+            <th class="px-4 py-3 text-right">Tu costo</th>
+            <th class="px-4 py-3 text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for c in catalogo %}
+            <tr>
+              <td class="px-4 py-3">{{ 'Mano de obra' if c.tipo == 'Servicio' else c.tipo }}</td>
+              <td class="px-4 py-3">{{ c.nombre }}</td>
+              <td class="px-4 py-3 text-right">{{ c.precio_centavos|dinero }}</td>
+              <td class="px-4 py-3 text-right text-slate-500">{{ c.costo_centavos|dinero if c.costo_centavos is not none else '—' }}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center justify-end gap-3">
+                  <a class="enlace" href="{{ url_for('catalogo', editar=c.id) }}">Editar</a>
+                  <form method="post" action="{{ url_for('catalogo_eliminar', item_id=c.id) }}" onsubmit="return confirm('¿Eliminar este elemento del catálogo?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="text-red-700 hover:underline" type="submit">Eliminar</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">El catálogo está vacío. Agrega aquí los repuestos y servicios que usas con frecuencia.</p>
+  {% endif %}
+{% endblock %}

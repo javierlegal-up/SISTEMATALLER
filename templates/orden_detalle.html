@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% from "_macros.html" import estado_badge %}
+{% block titulo %}{{ orden.id|num_ot }}{% endblock %}
+{% block contenido %}
+  {# El empleado ve qué se hizo, pero no importes; tampoco imprime, borra ni toca órdenes completadas. #}
+  {% set puede_editar = es_dueno or orden.estado != 'Completado' %}
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-semibold">{{ orden.id|num_ot }}</h1>
+      {{ estado_badge(orden.estado) }}
+      {% if es_dueno and orden.lineas_sin_precio %}
+        <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Falta poner precio</span>
+      {% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% if es_dueno %}
+        <a class="btn-primario" href="{{ url_for('orden_imprimir', orden_id=orden.id) }}" target="_blank" rel="noopener">Imprimir / PDF</a>
+      {% endif %}
+      {% if puede_editar %}
+        <a class="btn-secundario" href="{{ url_for('orden_editar', orden_id=orden.id) }}">{{ 'Editar y poner precios' if es_dueno and orden.lineas_sin_precio else 'Editar' }}</a>
+      {% endif %}
+      {% if es_dueno %}
+        <form method="post" action="{{ url_for('orden_eliminar', orden_id=orden.id) }}" onsubmit="return confirm('¿Eliminar esta orden de trabajo? No se puede deshacer.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn-peligro" type="submit">Eliminar</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mb-6 grid gap-6 md:grid-cols-3">
+    <section class="tarjeta text-sm">
+      <h2 class="mb-2 font-semibold">Cliente</h2>
+      <p><a class="enlace" href="{{ url_for('cliente_detalle', cliente_id=orden.cliente_id) }}">{{ orden.cliente_nombre }}</a></p>
+      <p class="text-slate-600">{{ orden.cliente_telefono }}</p>
+    </section>
+    <section class="tarjeta text-sm">
+      <h2 class="mb-2 font-semibold">Vehículo</h2>
+      <a class="enlace font-mono font-medium" href="{{ url_for('vehiculo_detalle', vehiculo_id=orden.vehiculo_id) }}" title="Ver el historial de este vehículo">{{ orden.patente }}</a>
+      <p class="text-slate-600">{{ orden.marca }} {{ orden.modelo }}{% if orden.anio %} ({{ orden.anio }}){% endif %}</p>
+      {% if orden.kilometraje is not none %}<p class="text-slate-600">{{ orden.kilometraje }} km</p>{% endif %}
+    </section>
+    <section class="tarjeta text-sm">
+      <h2 class="mb-2 font-semibold">Estado de la reparación</h2>
+      {% if puede_editar %}
+        <form method="post" action="{{ url_for('orden_cambiar_estado', orden_id=orden.id) }}" class="flex gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <select class="campo !mt-0" name="estado" aria-label="Estado">
+            {% for e in ESTADOS if es_dueno or e != 'Completado' %}<option value="{{ e }}" {{ 'selected' if e == orden.estado }}>{{ e }}</option>{% endfor %}
+          </select>
+          <button class="btn-secundario" type="submit">Cambiar</button>
+        </form>
+        {% if not es_dueno %}<p class="mt-2 text-xs text-slate-500">Para entregarla, avisa al dueño: él pone los precios y la completa.</p>{% endif %}
+      {% endif %}
+      <p class="mt-2 text-slate-600">Ingreso: {{ orden.fecha_ingreso|fecha }}</p>
+      {% if orden.fecha_completado %}<p class="text-slate-600">Completado: {{ orden.fecha_completado|fecha }}</p>{% endif %}
+    </section>
+  </div>
+
+  <section class="tarjeta mb-6 space-y-4 text-sm">
+    <div>
+      <h2 class="mb-1 font-semibold">Fallas reportadas</h2>
+      <p class="whitespace-pre-line">{{ orden.fallas }}</p>
+    </div>
+    {% if orden.diagnostico %}
+      <div>
+        <h2 class="mb-1 font-semibold">Diagnóstico / trabajo realizado</h2>
+        <p class="whitespace-pre-line">{{ orden.diagnostico }}</p>
+      </div>
+    {% endif %}
+    {% if orden.notas %}
+      <div>
+        <h2 class="mb-1 font-semibold">Notas para el cliente</h2>
+        <p class="whitespace-pre-line">{{ orden.notas }}</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="tarjeta">
+    <h2 class="mb-3 font-semibold">Repuestos y mano de obra</h2>
+    {% if items %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+            <tr>
+              <th class="py-2 pr-4">Tipo</th>
+              <th class="py-2 pr-4">Descripción</th>
+              <th class="py-2 pr-4 text-right">Cant.</th>
+              {% if es_dueno %}
+                <th class="py-2 pr-4 text-right">Precio unit.</th>
+                <th class="py-2 text-right">Subtotal</th>
+                <th class="py-2 pl-4 text-right text-slate-400" title="Uso interno: no aparece en el comprobante">Tu costo</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for i in items %}
+              <tr class="{{ 'bg-amber-50' if es_dueno and i.falta_precio }}">
+                <td class="py-2 pr-4">{{ 'Mano de obra' if i.tipo == 'Servicio' else i.tipo }}</td>
+                <td class="py-2 pr-4">{{ i.descripcion }}{% if i.del_cliente %} <span class="text-xs text-slate-500">(lo trajo el cliente)</span>{% endif %}</td>
+                <td class="py-2 pr-4 text-right">{{ i.cantidad|cantidad }}</td>
+                {% if es_dueno %}
+                  {% if i.falta_precio %}
+                    <td class="py-2 text-right" colspan="2"><span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Falta precio</span></td>
+                  {% else %}
+                    <td class="py-2 pr-4 text-right">{{ i.precio_unitario_centavos|dinero }}</td>
+                    <td class="py-2 text-right">{{ i.subtotal_centavos|dinero }}</td>
+                  {% endif %}
+                  <td class="py-2 pl-4 text-right text-slate-500">{{ i.costo_total_centavos|dinero if i.costo_total_centavos is not none else '—' }}</td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-500">Todavía no se cargaron repuestos ni mano de obra.</p>
+    {% endif %}
+
+    {% if es_dueno %}
+      <dl class="ml-auto mt-4 max-w-xs space-y-1 text-sm">
+        <div class="flex justify-between"><dt>Repuestos</dt><dd>{{ orden.total_repuestos|dinero }}</dd></div>
+        <div class="flex justify-between"><dt>Mano de obra</dt><dd>{{ orden.total_mano_obra|dinero }}</dd></div>
+        <div class="flex justify-between border-t border-slate-200 pt-1 text-base font-semibold"><dt>Total</dt><dd>{{ (orden.total_repuestos + orden.total_mano_obra)|dinero }}</dd></div>
+      </dl>
+
+      <div class="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm">
+        <p class="mb-1 text-xs font-semibold uppercase text-slate-500">Uso interno · no aparece en el comprobante</p>
+        <div class="flex flex-wrap gap-x-8 gap-y-1">
+          <span>Tu costo: <strong>{{ costos.costo|dinero }}</strong></span>
+          <span>Ganancia estimada: <strong>{{ (orden.total_repuestos + orden.total_mano_obra - costos.costo)|dinero }}</strong></span>
+        </div>
+        {% if costos.sin_costo %}
+          <p class="mt-1 text-xs text-amber-700">{{ costos.sin_costo }} {{ 'repuesto' if costos.sin_costo == 1 else 'repuestos' }} sin costo cargado: la ganancia real es menor que la estimada.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  {% if es_dueno and historial %}
+    <section class="tarjeta mt-6 text-sm">
+      <h2 class="mb-3 font-semibold">Historial: quién hizo qué</h2>
+      <ol class="space-y-2">
+        {% for h in historial %}
+          <li class="flex flex-wrap gap-x-3 border-l-2 border-red-200 pl-3">
+            <span class="whitespace-nowrap text-slate-500">{{ h.momento|momento }} · {{ h.momento|turno }}</span>
+            <span><strong>{{ h.usuario_nombre or '—' }}</strong>: {{ h.accion|lower }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Sin permiso{% endblock %}
+{% block contenido %}
+  <div class="tarjeta mx-auto mt-10 max-w-md border-t-4 border-t-red-600 text-center">
+    <p class="mb-2 text-4xl" aria-hidden="true">🔒</p>
+    <h1 class="mb-2 text-xl font-semibold">Esta parte es solo para el dueño</h1>
+    <p class="mb-5 text-sm text-neutral-500">Si necesitas algo de aquí, pídeselo al dueño del taller.</p>
+    <a class="btn-primario" href="{{ url_for('ordenes', estado='abiertas') }}">Volver a las órdenes</a>
+  </div>
+{% endblock %}

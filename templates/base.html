@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Inicio{% endblock %} · {{ TALLER.nombre }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // TEMA BLANCO Y ROJO.
+    // Las plantillas usan "blue" para enlaces, foco y detalles. Aquí esa paleta se
+    // redefine con los tonos de rojo, así todo el sistema queda en rojo sin tocar
+    // cada pantalla. El comprobante impreso no usa esta configuración.
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blue: {
+              50: "#fef2f2", 100: "#fee2e2", 200: "#fecaca", 300: "#fca5a5", 400: "#f87171",
+              500: "#ef4444", 600: "#dc2626", 700: "#b91c1c", 800: "#991b1b", 900: "#7f1d1d",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    input[type="checkbox"] { accent-color: #dc2626; }
+  </style>
+  <style type="text/tailwindcss">
+    /* Los botones y tarjetas solo cambian de color y sombra al pasar el mouse.
+       No se agrandan ni se mueven: eso hacía que temblaran ("se trabaran") en el borde. */
+    @layer components {
+      .campo { @apply mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 transition-colors focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30; }
+      .etiqueta { @apply block text-sm font-medium text-neutral-700; }
+      .tarjeta { @apply rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm; }
+      .btn { @apply inline-block cursor-pointer select-none rounded-xl px-4 py-2 text-center text-sm font-semibold transition-colors duration-150; }
+      .btn-primario { @apply btn bg-red-600 text-white shadow-md shadow-red-600/30 hover:bg-red-700 active:bg-red-800; }
+      .btn-secundario { @apply btn border border-neutral-300 bg-white text-neutral-700 hover:border-red-500 hover:text-red-700; }
+      .btn-peligro { @apply btn border border-red-300 bg-white text-red-700 hover:bg-red-50; }
+      .enlace { @apply text-red-600 hover:text-red-700 hover:underline; }
+    }
+  </style>
+</head>
+{% macro enlace_menu(href, texto, activo, conteo_estado=none) %}
+  <a href="{{ href }}" {% if activo %}aria-current="page"{% endif %}
+     class="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-150 {{ 'bg-red-600 font-semibold text-white shadow-md shadow-red-600/30' if activo else 'text-neutral-600 hover:bg-red-50 hover:text-red-700' }}">
+    <span>{{ texto }}</span>
+    {% if conteo_estado %}
+      <span class="min-w-6 rounded-full px-2 py-0.5 text-center text-xs font-bold {{ 'bg-white text-red-600' if activo else 'bg-red-600 text-white' }}" data-conteo="{{ conteo_estado }}">{{ nav_conteos[conteo_estado] }}</span>
+    {% endif %}
+  </a>
+{% endmacro %}
+<body class="min-h-screen bg-neutral-50 text-neutral-900 md:flex">
+  {% set pantalla = request.endpoint %}
+  {% set vista = request.args.get('estado', '') %}
+  {# Sin sesión iniciada (pantalla de ingreso) no se muestra el menú. #}
+  {% if usuario %}
+  <aside class="flex flex-col border-r border-neutral-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto">
+    <div class="flex items-center gap-3 border-b border-neutral-100 p-5">
+      <span class="grid h-9 w-9 place-items-center rounded-lg bg-red-600 text-lg shadow-md shadow-red-600/30" aria-hidden="true">🔧</span>
+      <a href="{{ url_for('inicio') }}" class="text-lg font-extrabold uppercase tracking-wide text-neutral-900">{{ TALLER.nombre }}</a>
+    </div>
+    <nav class="flex-1 space-y-6 px-3 py-5" aria-label="Menú principal">
+      {% if es_dueno %}
+        <div class="space-y-1">
+          {{ enlace_menu(url_for('inicio'), 'Panel', pantalla == 'inicio') }}
+        </div>
+      {% endif %}
+      <div class="space-y-1">
+        <p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-red-600">Órdenes de trabajo</p>
+        {% if es_dueno %}
+          {{ enlace_menu(url_for('ordenes', estado='sin_precio'), 'Falta poner precio', pantalla == 'ordenes' and vista == 'sin_precio', 'sin_precio') }}
+        {% endif %}
+        {{ enlace_menu(url_for('ordenes', estado='Pendiente'), 'Pendientes', pantalla == 'ordenes' and vista == 'Pendiente', 'Pendiente') }}
+        {{ enlace_menu(url_for('ordenes', estado='En Proceso'), 'En proceso', pantalla == 'ordenes' and vista == 'En Proceso', 'En Proceso') }}
+        {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado') }}
+        {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio')) }}
+        {{ enlace_menu(url_for('orden_nueva'), '+ Nueva orden', pantalla == 'orden_nueva') }}
+      </div>
+      <div class="space-y-1">
+        <p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-red-600">{{ 'Administración' if es_dueno else 'Registro' }}</p>
+        {{ enlace_menu(url_for('clientes'), 'Clientes', pantalla in ('clientes', 'cliente_nuevo', 'cliente_detalle', 'cliente_editar')) }}
+        {{ enlace_menu(url_for('vehiculos'), 'Vehículos', pantalla in ('vehiculos', 'vehiculo_detalle', 'vehiculo_editar')) }}
+        {% if es_dueno %}
+          {{ enlace_menu(url_for('catalogo'), 'Lista de precios', pantalla == 'catalogo') }}
+          {{ enlace_menu(url_for('usuarios'), 'Usuarios', pantalla == 'usuarios') }}
+          {{ enlace_menu(url_for('actividad'), 'Actividad', pantalla == 'actividad') }}
+        {% endif %}
+      </div>
+    </nav>
+    <div class="border-t border-neutral-100 p-4">
+      <p class="text-sm font-semibold text-neutral-900">{{ usuario.nombre }}</p>
+      <p class="mb-3 text-xs text-neutral-500">{{ NOMBRES_ROL[usuario.rol] }} · {{ usuario.usuario }}</p>
+      <form method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn-secundario w-full" type="submit">Cerrar sesión</button>
+      </form>
+    </div>
+  </aside>
+  {% endif %}
+
+  <div class="min-w-0 flex-1">
+    {% if SIMULACION %}
+      <p class="bg-red-600 px-4 py-1.5 text-center text-sm font-semibold text-white">
+        Modo simulación: los datos son inventados y se reinician cada vez que abres la simulación. Tus datos reales no se tocan.
+      </p>
+    {% endif %}
+
+    <main class="mx-auto max-w-6xl px-4 py-6 md:px-8">
+      {% if guia %}
+        <details class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
+          <summary class="cursor-pointer font-semibold">💬 Comentario: {{ guia.titulo }} <span class="font-normal">(clic para ver cómo funciona)</span></summary>
+          <ol class="mt-2 list-inside list-decimal space-y-1">
+            {% for paso in guia.pasos %}<li>{{ paso }}</li>{% endfor %}
+          </ol>
+        </details>
+      {% endif %}
+      {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
+        <div class="mb-4 rounded-lg border p-3 text-sm {{ 'border-red-200 bg-red-50 text-red-800' if categoria == 'error' else 'border-green-200 bg-green-50 text-green-800' }}" role="status">{{ mensaje }}</div>
+      {% endfor %}
+      {% block contenido %}{% endblock %}
+    </main>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

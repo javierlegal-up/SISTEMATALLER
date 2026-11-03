@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Vehículos{% endblock %}
+{% block contenido %}
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">Vehículos <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
+    <a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+  </div>
+  <p class="mb-5 text-sm text-slate-500">Elige un vehículo para ver todo lo que se le hizo{{ ' y cuánto suma' if es_dueno }}.</p>
+
+  <form method="get" class="mb-4 flex gap-2">
+    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por patente, marca, modelo o cliente" aria-label="Buscar vehículos">
+    <button class="btn-secundario" type="submit">Buscar</button>
+    {% if busqueda %}<a class="btn-secundario" href="{{ url_for('vehiculos') }}">Limpiar</a>{% endif %}
+  </form>
+
+  {% if vehiculos %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Patente</th>
+            <th class="px-4 py-3">Vehículo</th>
+            <th class="px-4 py-3">Cliente</th>
+            <th class="px-4 py-3 text-right">Órdenes</th>
+            <th class="px-4 py-3">Última visita</th>
+            {% if es_dueno %}<th class="px-4 py-3 text-right">Total completado</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for v in vehiculos %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3"><a class="enlace font-mono font-medium" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">{{ v.patente }}</a></td>
+              <td class="px-4 py-3">{{ v.marca }} {{ v.modelo }}{% if v.anio %} ({{ v.anio }}){% endif %}</td>
+              <td class="px-4 py-3"><a class="enlace" href="{{ url_for('cliente_detalle', cliente_id=v.cliente_id) }}">{{ v.cliente_nombre }}</a></td>
+              <td class="px-4 py-3 text-right">{{ v.total_ordenes }}</td>
+              <td class="whitespace-nowrap px-4 py-3">{{ v.ultima_visita|fecha or '—' }}</td>
+              {% if es_dueno %}<td class="whitespace-nowrap px-4 py-3 text-right font-medium">{{ v.total_completado|dinero }}</td>{% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">No hay vehículos para mostrar.</p>
+  {% endif %}
+{% endblock %}

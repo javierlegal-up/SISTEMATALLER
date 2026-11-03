@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Actividad{% endblock %}
+{% block contenido %}
+  <h1 class="text-2xl font-semibold">Actividad <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
+  <p class="mb-5 mt-1 text-sm text-neutral-500">Quién hizo qué y cuándo. El turno se calcula por la hora.</p>
+
+  <form method="get" class="mb-4 flex flex-wrap gap-2">
+    <select class="campo !mt-0 !w-auto" name="usuario" aria-label="Persona">
+      <option value="">Todas las personas</option>
+      {% for p in personas %}<option value="{{ p.id }}" {{ 'selected' if p.id == usuario_id }}>{{ p.nombre }}</option>{% endfor %}
+    </select>
+    <input class="campo !mt-0 !w-auto" type="date" name="fecha" value="{{ dia }}" aria-label="Día">
+    <button class="btn-secundario" type="submit">Filtrar</button>
+    {% if usuario_id or dia %}<a class="btn-secundario" href="{{ url_for('actividad') }}">Limpiar</a>{% endif %}
+  </form>
+
+  {% if registros %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Fecha y hora</th>
+            <th class="px-4 py-3">Turno</th>
+            <th class="px-4 py-3">Persona</th>
+            <th class="px-4 py-3">Qué hizo</th>
+            <th class="px-4 py-3">Detalle</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for r in registros %}
+            <tr class="hover:bg-slate-50">
+              <td class="whitespace-nowrap px-4 py-3">{{ r.momento|momento }}</td>
+              <td class="px-4 py-3">{{ r.momento|turno }}</td>
+              <td class="px-4 py-3 font-medium">{{ r.usuario_nombre or '—' }}</td>
+              <td class="px-4 py-3">{{ r.accion }}</td>
+              <td class="px-4 py-3 text-slate-600">
+                {% if r.orden_id %}<a class="enlace" href="{{ url_for('orden_detalle', orden_id=r.orden_id) }}">{{ r.detalle }}</a>{% else %}{{ r.detalle }}{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">No hay actividad para mostrar.</p>
+  {% endif %}
+{% endblock %}

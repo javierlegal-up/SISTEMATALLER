@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% block titulo %}Editar vehículo{% endblock %}
+{% block contenido %}
+  <h1 class="mb-6 text-2xl font-semibold">Editar vehículo</h1>
+  {{ lista_errores(errores) }}
+
+  <form method="post" class="tarjeta space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="etiqueta">Patente *<input class="campo font-mono uppercase" name="patente" value="{{ vehiculo.patente }}" maxlength="15" required></label>
+      <label class="etiqueta">Marca *<input class="campo" name="marca" value="{{ vehiculo.marca }}" required></label>
+      <label class="etiqueta">Modelo *<input class="campo" name="modelo" value="{{ vehiculo.modelo }}" required></label>
+      <label class="etiqueta">Año<input class="campo" name="anio" value="{{ vehiculo.anio or '' }}" inputmode="numeric" maxlength="4"></label>
+      <label class="etiqueta">Color<input class="campo" name="color" value="{{ vehiculo.color }}"></label>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn-primario" type="submit">Guardar</button>
+      <a class="btn-secundario" href="{{ url_for('cliente_detalle', cliente_id=vehiculo.cliente_id) }}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

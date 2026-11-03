@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- El navegador usa este título como nombre sugerido al guardar en PDF. -->
+  <title>{{ orden.id|num_ot }} - {{ orden.patente }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    tr, .sin-corte { break-inside: avoid; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 print:bg-white">
+  <div class="mx-auto flex max-w-[210mm] justify-end gap-2 px-4 py-4 print:hidden">
+    <a href="{{ url_for('orden_detalle', orden_id=orden.id) }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Volver</a>
+    {% if orden.lineas_sin_precio %}
+      <p class="mr-auto self-center rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">Atención: hay líneas sin precio. Ponles precio antes de entregar este comprobante.</p>
+    {% endif %}
+    <button type="button" onclick="window.print()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Imprimir / Guardar PDF</button>
+  </div>
+
+  <main class="mx-auto mb-8 max-w-[210mm] bg-white p-10 text-sm shadow print:mb-0 print:max-w-none print:p-0 print:shadow-none">
+    <header class="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-4">
+      <div>
+        <p class="text-xl font-bold">{{ TALLER.nombre }}</p>
+        <p>{{ TALLER.direccion }}</p>
+        <p>{{ TALLER.telefono }}</p>
+        {% if TALLER.email %}<p>{{ TALLER.email }}</p>{% endif %}
+      </div>
+      <div class="text-right">
+        <p class="text-xs uppercase tracking-wide text-slate-600">Orden de trabajo</p>
+        <p class="text-xl font-bold">{{ orden.id|num_ot }}</p>
+        <p>Ingreso: {{ orden.fecha_ingreso|fecha }}</p>
+        {% if orden.fecha_completado %}<p>Completado: {{ orden.fecha_completado|fecha }}</p>{% endif %}
+        <p>Estado: <strong>{{ orden.estado }}</strong></p>
+      </div>
+    </header>
+
+    <div class="mt-4 grid grid-cols-2 gap-6">
+      <section>
+        <h2 class="mb-1 border-b border-slate-300 pb-1 font-semibold">Cliente</h2>
+        <p>{{ orden.cliente_nombre }}</p>
+        {% if orden.cliente_documento %}<p>Documento: {{ orden.cliente_documento }}</p>{% endif %}
+        {% if orden.cliente_telefono %}<p>Teléfono: {{ orden.cliente_telefono }}</p>{% endif %}
+        {% if orden.cliente_email %}<p>{{ orden.cliente_email }}</p>{% endif %}
+        {% if orden.cliente_direccion %}<p>{{ orden.cliente_direccion }}</p>{% endif %}
+      </section>
+      <section>
+        <h2 class="mb-1 border-b border-slate-300 pb-1 font-semibold">Vehículo</h2>
+        <p>Patente: <strong class="font-mono">{{ orden.patente }}</strong></p>
+        <p>{{ orden.marca }} {{ orden.modelo }}{% if orden.anio %} ({{ orden.anio }}){% endif %}</p>
+        {% if orden.color %}<p>Color: {{ orden.color }}</p>{% endif %}
+        {% if orden.kilometraje is not none %}<p>Kilometraje: {{ orden.kilometraje }} km</p>{% endif %}
+      </section>
+    </div>
+
+    <section class="sin-corte mt-4">
+      <h2 class="mb-1 border-b border-slate-300 pb-1 font-semibold">Fallas reportadas</h2>
+      <p class="whitespace-pre-line">{{ orden.fallas }}</p>
+    </section>
+    {% if orden.diagnostico %}
+      <section class="sin-corte mt-4">
+        <h2 class="mb-1 border-b border-slate-300 pb-1 font-semibold">Diagnóstico / trabajo realizado</h2>
+        <p class="whitespace-pre-line">{{ orden.diagnostico }}</p>
+      </section>
+    {% endif %}
+
+    <section class="mt-4">
+      <h2 class="mb-1 font-semibold">Detalle</h2>
+      <table class="w-full border-collapse text-left">
+        <thead>
+          <tr class="border-y border-slate-900 text-xs uppercase">
+            <th class="py-1 pr-2">Tipo</th>
+            <th class="py-1 pr-2">Descripción</th>
+            <th class="py-1 pr-2 text-right">Cant.</th>
+            <th class="py-1 pr-2 text-right">Precio unit.</th>
+            <th class="py-1 text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in items %}
+            <tr class="border-b border-slate-200">
+              <td class="py-1 pr-2">{{ 'Mano de obra' if i.tipo == 'Servicio' else i.tipo }}</td>
+              <td class="py-1 pr-2">{{ i.descripcion }}{% if i.del_cliente %} <span class="text-xs">(provisto por el cliente)</span>{% endif %}</td>
+              <td class="py-1 pr-2 text-right">{{ i.cantidad|cantidad }}</td>
+              <td class="py-1 pr-2 text-right">{{ i.precio_unitario_centavos|dinero }}</td>
+              <td class="py-1 text-right">{{ i.subtotal_centavos|dinero }}</td>
+            </tr>
+          {% else %}
+            <tr class="border-b border-slate-200"><td colspan="5" class="py-2 text-slate-600">Sin repuestos ni mano de obra cargados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <dl class="sin-corte ml-auto mt-3 max-w-[70mm] space-y-1">
+        <div class="flex justify-between"><dt>Repuestos</dt><dd>{{ orden.total_repuestos|dinero }}</dd></div>
+        <div class="flex justify-between"><dt>Mano de obra</dt><dd>{{ orden.total_mano_obra|dinero }}</dd></div>
+        <div class="flex justify-between border-t-2 border-slate-900 pt-1 text-base font-bold"><dt>Total</dt><dd>{{ (orden.total_repuestos + orden.total_mano_obra)|dinero }}</dd></div>
+      </dl>
+    </section>
+
+    {% if orden.notas %}
+      <section class="sin-corte mt-4">
+        <h2 class="mb-1 border-b border-slate-300 pb-1 font-semibold">Notas</h2>
+        <p class="whitespace-pre-line">{{ orden.notas }}</p>
+      </section>
+    {% endif %}
+
+    <div class="sin-corte mt-16 grid grid-cols-2 gap-12 text-center text-xs">
+      <p class="border-t border-slate-900 pt-1">Firma del taller</p>
+      <p class="border-t border-slate-900 pt-1">Firma del cliente</p>
+    </div>
+  </main>
+</body>
+</html>

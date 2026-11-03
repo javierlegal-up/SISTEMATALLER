@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Iniciar sesión{% endblock %}
+{% block contenido %}
+  <div class="mx-auto mt-10 max-w-sm">
+    <div class="mb-6 text-center">
+      <span class="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-red-600 text-3xl shadow-lg shadow-red-600/30" aria-hidden="true">🔧</span>
+      <h1 class="text-2xl font-extrabold uppercase tracking-wide">{{ TALLER.nombre }}</h1>
+      <p class="text-sm text-neutral-500">Ingresa con tu usuario</p>
+    </div>
+
+    <form method="post" class="tarjeta space-y-4 border-t-4 border-t-red-600">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if error %}
+        <p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{{ error }}</p>
+      {% endif %}
+      <label class="etiqueta">Usuario<input class="campo" name="usuario" value="{{ usuario_escrito }}" autocomplete="username" autofocus required></label>
+      <label class="etiqueta">Contraseña<input class="campo" type="password" name="clave" autocomplete="current-password" required></label>
+      <button class="btn-primario w-full" type="submit">Ingresar</button>
+    </form>
+    <p class="mt-4 text-center text-xs text-neutral-500">¿Olvidaste tu contraseña? Pídele al dueño que te asigne una nueva.</p>
+  </div>
+{% endblock %}

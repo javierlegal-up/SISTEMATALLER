@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block contenido %}
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">{{ titulo }} <span class="text-lg font-normal text-slate-500">(<span id="total-lista">{{ paginacion.total }}</span>)</span></h1>
+    <a class="btn-primario" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
+  </div>
+
+  <form method="get" class="mb-4 flex gap-2">
+    {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
+    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por cliente, patente, marca o modelo" aria-label="Buscar órdenes">
+    <button class="btn-secundario" type="submit">Buscar</button>
+    {% if busqueda %}<a class="btn-secundario" href="{{ url_for('ordenes', estado=estado) if estado else url_for('ordenes') }}">Limpiar</a>{% endif %}
+  </form>
+
+  {% if ordenes %}
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">N.º</th>
+            <th class="px-4 py-3">Cliente</th>
+            <th class="px-4 py-3">Vehículo</th>
+            <th class="px-4 py-3">Falla</th>
+            <th class="px-4 py-3">{{ 'Finalización' if estado == 'Completado' else 'Tiempo' }}</th>
+            <th class="px-4 py-3">Estado</th>
+            {% if es_dueno %}<th class="px-4 py-3 text-right">Total</th>{% endif %}
+            <th class="px-4 py-3 text-right">Mover a</th>
+          </tr>
+        </thead>
+        <tbody id="filas" class="divide-y divide-slate-100" data-vista="{{ estado }}">
+          {% for o in ordenes %}{% include "_fila_orden.html" %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">No hay órdenes para mostrar.</p>
+  {% endif %}
+
+  <dialog id="ventana-orden" class="w-full max-w-lg rounded-2xl border border-neutral-200 border-t-4 border-t-red-600 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-neutral-900/50"></dialog>
+  <div id="avisos" class="fixed bottom-4 right-4 z-50 space-y-2" aria-live="polite"></div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const CSRF = {{ csrf_token|tojson }};
+    const filas = document.getElementById("filas");
+    const ventana = document.getElementById("ventana-orden");
+
+    function avisar(mensaje, esError = false) {
+      const aviso = document.createElement("div");
+      aviso.className = "rounded-lg px-4 py-2 text-sm font-medium text-neutral-50 shadow-lg " +
+        (esError ? "bg-red-600" : "border-l-4 border-red-600 bg-neutral-800");
+      aviso.textContent = mensaje;
+      document.getElementById("avisos").appendChild(aviso);
+      setTimeout(() => aviso.remove(), esError ? 6000 : 2500);
+    }
+
+    function sigueEnLaLista(estado) {
+      const vista = filas.dataset.vista;
+      if (vista === "") return true;
+      if (vista === "abiertas" || vista === "atrasadas") return estado !== "Completado";
+      return vista === estado;
+    }
+
+    // La fila solo cambia cuando el servidor confirma que guardó el cambio.
+    async function moverOrden(fila, estado) {
+      const cuerpo = new FormData();
+      cuerpo.append("csrf_token", CSRF);
+      cuerpo.append("estado", estado);
+
+      let datos;
+      try {
+        const respuesta = await fetch(fila.dataset.urlEstado, { method: "POST", body: cuerpo });
+        datos = await respuesta.json().catch(() => ({}));
+        if (!respuesta.ok) {
+          // El servidor explica el motivo, por ejemplo "falta poner precios".
+          avisar(datos.error || "No se pudo cambiar el estado. Recarga la página e inténtalo de nuevo.", true);
+          return;
+        }
+      } catch (error) {
+        avisar("No se pudo cambiar el estado. Recarga la página e inténtalo de nuevo.", true);
+        return;
+      }
+
+      const numero = fila.dataset.numero;
+      if (sigueEnLaLista(estado)) {
+        fila.outerHTML = datos.fila;
+      } else {
+        fila.remove();
+        const total = document.getElementById("total-lista");
+        total.textContent = Number(total.textContent) - 1;
+      }
+      document.querySelectorAll("[data-conteo]").forEach((elemento) => {
+        elemento.textContent = datos.conteos[elemento.dataset.conteo];
+      });
+      avisar(`${numero} pasó a ${estado}`);
+      // Si la página quedó vacía, recargar trae las órdenes de la página siguiente, si las hay.
+      if (!filas.querySelector(".fila-orden")) location.reload();
+    }
+
+    async function abrirOrden(fila) {
+      try {
+        const respuesta = await fetch(fila.dataset.urlRapida);
+        if (!respuesta.ok) throw new Error(String(respuesta.status));
+        // El HTML viene de este mismo servidor, ya escapado por la plantilla.
+        ventana.innerHTML = await respuesta.text();
+        ventana.showModal();
+      } catch (error) {
+        avisar("No se pudo abrir la orden. Recarga la página.", true);
+      }
+    }
+
+    if (filas) {
+      filas.addEventListener("click", (evento) => {
+        const fila = evento.target.closest(".fila-orden");
+        if (!fila) return;
+        const boton = evento.target.closest(".mover-orden");
+        if (boton) {
+          moverOrden(fila, boton.dataset.destino);
+        } else {
+          abrirOrden(fila);
+        }
+      });
+    }
+
+    ventana.addEventListener("click", (evento) => {
+      // Un clic en el fondo oscuro tiene como destino el propio <dialog>.
+      if (evento.target === ventana || evento.target.closest(".cerrar-ventana")) ventana.close();
+    });
+  </script>
+{% endblock %}

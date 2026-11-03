@@ -1,0 +1,45 @@
+{% from "_macros.html" import estado_badge %}
+{# El empleado no ve importes, no completa órdenes ni reabre las completadas. #}
+{% set puede_anterior = o.anterior and (es_dueno or o.estado != 'Completado') %}
+{% set puede_siguiente = o.siguiente and (es_dueno or o.siguiente != 'Completado') %}
+<tr class="fila-orden cursor-pointer hover:bg-slate-50"
+    data-estado="{{ o.estado }}"
+    data-numero="{{ o.id|num_ot }}"
+    data-atrasada="{{ '1' if o.atrasada else '0' }}"
+    data-url-estado="{{ url_for('api_orden_estado', orden_id=o.id) }}"
+    data-url-rapida="{{ url_for('orden_rapida', orden_id=o.id) }}">
+  <td class="whitespace-nowrap px-4 py-3"><button type="button" class="enlace font-medium">{{ o.id|num_ot }}</button></td>
+  <td class="px-4 py-3">{{ o.cliente_nombre }}</td>
+  <td class="px-4 py-3"><span class="font-mono">{{ o.patente }}</span><span class="block text-xs text-slate-500">{{ o.marca }} {{ o.modelo }}</span></td>
+  <td class="max-w-56 truncate px-4 py-3 text-slate-600" title="{{ o.fallas }}">{{ o.fallas }}</td>
+  <td class="whitespace-nowrap px-4 py-3 text-slate-600">
+    {% if o.estado == 'Completado' %}
+      {{ o.fecha_completado|fecha }}
+    {% elif o.atrasada %}
+      <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Atrasada · {{ o.dias }} días</span>
+    {% elif o.dias == 0 %}
+      Hoy
+    {% else %}
+      Hace {{ o.dias }} {{ 'día' if o.dias == 1 else 'días' }}
+    {% endif %}
+  </td>
+  <td class="px-4 py-3">{{ estado_badge(o.estado) }}</td>
+  {% if es_dueno %}
+    <td class="whitespace-nowrap px-4 py-3 text-right font-medium">
+      {% if o.lineas_sin_precio %}
+        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Falta precio</span>
+      {% else %}
+        {{ o.total|dinero }}
+      {% endif %}
+    </td>
+  {% endif %}
+  <td class="whitespace-nowrap px-4 py-3 text-right">
+    {% if puede_anterior %}
+      <button type="button" class="mover-orden rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-100" data-destino="{{ o.anterior }}" aria-label="Mover {{ o.id|num_ot }} a {{ o.anterior }}">← {{ o.anterior }}</button>
+    {% endif %}
+    {% if puede_siguiente %}
+      <button type="button" class="mover-orden rounded border border-blue-300 bg-white px-2 py-1 text-xs text-blue-700 hover:bg-blue-50" data-destino="{{ o.siguiente }}" aria-label="Mover {{ o.id|num_ot }} a {{ o.siguiente }}">{{ o.siguiente }} →</button>
+    {% endif %}
+    {% if not puede_anterior and not puede_siguiente %}<span class="text-xs text-slate-400">—</span>{% endif %}
+  </td>
+</tr>

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% block titulo %}Configuración inicial{% endblock %}
+{% block contenido %}
+  <div class="mx-auto mt-6 max-w-md">
+    <div class="mb-6 text-center">
+      <span class="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-red-600 text-3xl shadow-lg shadow-red-600/30" aria-hidden="true">🔧</span>
+      <h1 class="text-2xl font-extrabold">Bienvenido a {{ TALLER.nombre }}</h1>
+      <p class="text-sm text-neutral-500">Primero crea la cuenta del <strong>dueño</strong>. Con ella después creas los usuarios de los empleados.</p>
+    </div>
+    {{ lista_errores(errores) }}
+    <form method="post" class="tarjeta space-y-4 border-t-4 border-t-red-600">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="etiqueta">Tu nombre<input class="campo" name="nombre" value="{{ datos.nombre }}" required></label>
+      <label class="etiqueta">Usuario para ingresar<input class="campo" name="usuario" value="{{ datos.usuario }}" placeholder="Ej.: dueno" autocomplete="username" required></label>
+      <label class="etiqueta">Contraseña<input class="campo" type="password" name="clave" autocomplete="new-password" required></label>
+      <label class="etiqueta">Repite la contraseña<input class="campo" type="password" name="clave2" autocomplete="new-password" required></label>
+      <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-950">Anota la contraseña en un lugar seguro. Es la única cuenta que ve los números y crea usuarios.</p>
+      <button class="btn-primario w-full" type="submit">Crear cuenta del dueño</button>
+    </form>
+  </div>
+{% endblock %}

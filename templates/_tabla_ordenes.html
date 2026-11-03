@@ -1,0 +1,31 @@
+{% from "_macros.html" import estado_badge %}
+{% if ordenes %}
+  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+        <tr>
+          <th class="px-4 py-3">N.º</th>
+          <th class="px-4 py-3">Ingreso</th>
+          <th class="px-4 py-3">Cliente</th>
+          <th class="px-4 py-3">Vehículo</th>
+          <th class="px-4 py-3">Estado</th>
+          {% if es_dueno %}<th class="px-4 py-3 text-right">Total</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for o in ordenes %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3"><a class="enlace font-medium" href="{{ url_for('orden_detalle', orden_id=o.id) }}">{{ o.id|num_ot }}</a></td>
+            <td class="px-4 py-3">{{ o.fecha_ingreso|fecha }}</td>
+            <td class="px-4 py-3">{{ o.cliente_nombre }}</td>
+            <td class="px-4 py-3"><a class="enlace font-mono" href="{{ url_for('vehiculo_detalle', vehiculo_id=o.vehiculo_id) }}">{{ o.patente }}</a> · {{ o.marca }} {{ o.modelo }}</td>
+            <td class="px-4 py-3">{{ estado_badge(o.estado) }}</td>
+            {% if es_dueno %}<td class="px-4 py-3 text-right">{{ 'Falta precio' if o.lineas_sin_precio else (o.total_repuestos + o.total_mano_obra)|dinero }}</td>{% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="tarjeta text-sm text-slate-500">No hay órdenes para mostrar.</p>
+{% endif %}
