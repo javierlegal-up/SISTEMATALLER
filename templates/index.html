@@ -3,92 +3,114 @@
 {% set mes_actual = resumen.meses[-1] %}
 {% set mes_anterior = resumen.meses[-2] %}
 {% block contenido %}
-  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold">Panel del taller</h1>
-    <div class="flex flex-wrap gap-2">
-      <a class="btn-secundario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
-      <a class="btn-primario" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
+  <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-600">{{ TALLER.nombre }}</p>
+      <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Panel del taller</h1>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <a class="btn-acento" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+      <a class="btn-primario btn-latido" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
     </div>
   </div>
 
-  <div class="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <a class="tarjeta border-t-4 border-t-red-600 transition-shadow duration-150 hover:shadow-md hover:shadow-red-600/20" href="{{ url_for('ordenes', estado='abiertas') }}">
-      <p class="text-sm text-slate-500">Órdenes abiertas</p>
-      <p class="mt-1 text-3xl font-semibold">{{ resumen.abiertas }}</p>
-      <p class="mt-1 text-xs text-slate-500">Ver la lista →</p>
+  {# Indicadores. Las dos primeras son alertas rápidas: llevan el detalle rojo. #}
+  <div class="mb-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <a class="tarjeta group relative overflow-hidden" href="{{ url_for('ordenes', estado='abiertas') }}">
+      <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 to-red-600" aria-hidden="true"></span>
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Órdenes abiertas</p>
+      <p class="mt-3 text-4xl font-extrabold tracking-tight text-slate-900 tabular-nums">{{ resumen.abiertas }}</p>
+      <p class="mt-3 text-xs font-medium text-red-600 transition-colors group-hover:text-red-700">Ver la lista →</p>
     </a>
-    <a class="tarjeta border-t-4 border-t-red-600 transition-shadow duration-150 hover:shadow-md hover:shadow-red-600/20 {{ 'ring-1 ring-red-500/50' if resumen.atrasadas }}" href="{{ url_for('ordenes', estado='atrasadas') }}">
-      <p class="text-sm text-slate-500">Atrasadas <span class="text-xs">(más de {{ dias_atraso }} días)</span></p>
-      <p class="mt-1 text-3xl font-semibold {{ 'text-red-700' if resumen.atrasadas }}">{{ resumen.atrasadas }}</p>
-      <p class="mt-1 text-xs text-slate-500">Ver la lista →</p>
+    <a class="tarjeta group relative overflow-hidden {{ 'ring-1 ring-red-200' if resumen.atrasadas }}" href="{{ url_for('ordenes', estado='atrasadas') }}">
+      <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 to-red-600" aria-hidden="true"></span>
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Atrasadas <span class="normal-case tracking-normal text-slate-400">(más de {{ dias_atraso }} días)</span></p>
+      <p class="mt-3 text-4xl font-extrabold tracking-tight tabular-nums {{ 'text-red-600' if resumen.atrasadas else 'text-slate-900' }}">{{ resumen.atrasadas }}</p>
+      <p class="mt-3 text-xs font-medium text-red-600 transition-colors group-hover:text-red-700">Ver la lista →</p>
     </a>
     <div class="tarjeta">
-      <p class="text-sm text-slate-500">Valor del trabajo en curso</p>
-      <p class="mt-1 text-2xl font-semibold xl:text-3xl">{{ resumen.valor_abierto|dinero }}</p>
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Valor del trabajo en curso</p>
+      <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ resumen.valor_abierto|dinero }}</p>
     </div>
     <div class="tarjeta">
-      <p class="text-sm text-slate-500">Completado este mes</p>
-      <p class="mt-1 text-2xl font-semibold xl:text-3xl">{{ (mes_actual.repuestos + mes_actual.mano_obra)|dinero }}</p>
-      <p class="mt-1 text-xs text-slate-500">Mes anterior: {{ (mes_anterior.repuestos + mes_anterior.mano_obra)|dinero }}</p>
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Completado este mes</p>
+      <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ (mes_actual.repuestos + mes_actual.mano_obra)|dinero }}</p>
+      <p class="mt-2 text-xs text-slate-500">Mes anterior: <span class="font-semibold text-slate-700">{{ (mes_anterior.repuestos + mes_anterior.mano_obra)|dinero }}</span></p>
     </div>
   </div>
 
-  <div class="grid gap-5 lg:grid-cols-3">
+  <div class="grid gap-6 lg:grid-cols-3">
     <section class="tarjeta lg:col-span-2">
-      <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="font-semibold">Trabajo completado por mes</h2>
-          <p class="text-xs text-slate-500">Pasa el cursor o haz clic en un mes.</p>
+          <h2 class="text-base font-bold tracking-tight">Trabajo completado por mes</h2>
+          <p class="mt-0.5 text-xs text-slate-500">Pasa el cursor o haz clic en un mes.</p>
         </div>
-        <div class="flex gap-4 text-xs text-slate-600">
-          <span><span class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-red-600"></span>Mano de obra</span>
-          <span><span class="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-neutral-500"></span>Repuestos</span>
+        <div class="flex gap-4 text-xs font-medium text-slate-600">
+          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-full bg-red-600"></span>Mano de obra</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-full bg-slate-300"></span>Repuestos</span>
         </div>
       </div>
-      <div id="grafico" class="flex h-36 items-end gap-2 sm:gap-4"></div>
-      <p id="grafico-detalle" class="mt-3 rounded-lg bg-slate-50 p-2.5 text-sm" aria-live="polite"></p>
+      <div id="grafico" class="flex h-40 items-end gap-2 sm:gap-4"></div>
+      <p id="grafico-detalle" class="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700" aria-live="polite"></p>
     </section>
 
     <section class="tarjeta">
-      <div class="mb-3 flex items-center justify-between gap-3">
-        <h2 class="font-semibold">Requieren atención</h2>
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold tracking-tight">Requieren atención</h2>
         {% if resumen.atrasadas %}<a class="enlace text-xs" href="{{ url_for('ordenes', estado='atrasadas') }}">Ver todas</a>{% endif %}
       </div>
-      <div class="space-y-2">
+      <div class="space-y-2.5">
         {% for o in atrasadas %}
           {% include "_tarjeta_orden.html" %}
         {% else %}
-          <p class="py-6 text-center text-sm text-slate-500">No hay órdenes atrasadas.</p>
+          <div class="flex flex-col items-center gap-2 py-8 text-center">
+            <span class="grid h-10 w-10 place-items-center rounded-full bg-emerald-50 text-emerald-600" aria-hidden="true">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            </span>
+            <p class="text-sm text-slate-500">No hay órdenes atrasadas.</p>
+          </div>
         {% endfor %}
       </div>
     </section>
   </div>
 
-  <section class="tarjeta mt-5 text-sm">
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="font-semibold">Copias de seguridad</h2>
+  {# Copias de seguridad: banner con estado e invitación a actuar. #}
+  <section class="mt-6 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm shadow-slate-200/60 transition-all duration-300 hover:shadow-md">
+    <div class="flex flex-wrap items-center justify-between gap-4 p-6">
+      <div class="flex items-center gap-4">
+        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl {{ 'bg-emerald-50 text-emerald-600' if respaldo_ok and not aviso_copia_externa else 'bg-amber-50 text-amber-600' }}" aria-hidden="true">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+        </span>
+        <div>
+          <h2 class="text-base font-bold tracking-tight">Copias de seguridad</h2>
+          <dl class="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div class="flex gap-1.5"><dt class="text-slate-500">En esta compu</dt><dd class="font-semibold text-slate-800">{{ ultimo_respaldo|fecha or 'Ninguna' }}</dd></div>
+            <div class="flex gap-1.5"><dt class="text-slate-500">Fuera de la compu (pendrive o nube)</dt><dd class="font-semibold text-slate-800">{{ copia_externa or 'Nunca' }}</dd></div>
+          </dl>
+        </div>
+      </div>
       <form method="post" action="{{ url_for('respaldo_ahora') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="btn-secundario" type="submit">Hacer copia ahora</button>
+        <button class="btn-primario" type="submit">Hacer copia ahora</button>
       </form>
     </div>
 
     {% if not respaldo_ok %}
-      <p class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800" role="alert">
-        No se pudo crear la copia de seguridad de hoy. Revisa la carpeta de respaldos y copia <code>taller.db</code> a un lugar seguro.
-      </p>
+      <div class="flex items-start gap-3 border-t border-red-100 bg-red-50/70 px-6 py-4 text-sm text-red-800" role="alert">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <p>No se pudo crear la copia de seguridad de hoy. Revisa la carpeta de respaldos y copia <code>taller.db</code> a un lugar seguro.</p>
+      </div>
     {% endif %}
 
-    <dl class="grid gap-2 sm:grid-cols-2">
-      <div><dt class="text-slate-500">En esta compu</dt><dd class="font-medium">{{ ultimo_respaldo|fecha or 'Ninguna' }}</dd></div>
-      <div><dt class="text-slate-500">Fuera de la compu (pendrive o nube)</dt><dd class="font-medium">{{ copia_externa or 'Nunca' }}</dd></div>
-    </dl>
-
     {% if aviso_copia_externa %}
-      <p class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950" role="alert">
-        {% if copia_externa %}Hace más de {{ dias_aviso_copia_externa }} días que no hay una copia fuera de la compu.{% else %}Todavía no hay ninguna copia fuera de la compu.{% endif %}
-        Si se rompe el disco, se perdería todo. Conecta el pendrive (con la carpeta <strong>{{ carpeta_pendrive }}</strong>) y pulsa <strong>Hacer copia ahora</strong>.
-      </p>
+      <div class="flex items-start gap-3 border-t border-amber-100 bg-amber-50/70 px-6 py-4 text-sm text-amber-900" role="alert">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <p>
+          {% if copia_externa %}Hace más de {{ dias_aviso_copia_externa }} días que no hay una copia fuera de la compu.{% else %}Todavía no hay ninguna copia fuera de la compu.{% endif %}
+          Si se rompe el disco, se perdería todo. Conecta el pendrive (con la carpeta <strong>{{ carpeta_pendrive }}</strong>) y pulsa <strong>Hacer copia ahora</strong>.
+        </p>
+      </div>
     {% endif %}
   </section>
 {% endblock %}
@@ -108,19 +130,19 @@
         `${mes.etiqueta}: ${dinero(totalMes(mes))} en ${mes.ordenes} ${mes.ordenes === 1 ? "orden" : "órdenes"} ` +
         `(mano de obra ${dinero(mes.mano_obra)}, repuestos ${dinero(mes.repuestos)})`;
       grafico.querySelectorAll("button").forEach((barra, posicion) => {
-        barra.classList.toggle("bg-slate-100", posicion === indice);
+        barra.classList.toggle("bg-slate-50", posicion === indice);
       });
     }
 
     MESES.forEach((mes, indice) => {
       const barra = document.createElement("button");
       barra.type = "button";
-      barra.className = "flex h-full flex-1 flex-col justify-end rounded-lg px-1 transition hover:bg-slate-100";
+      barra.className = "flex h-full flex-1 flex-col justify-end rounded-xl px-1.5 pt-2 transition-colors duration-200 hover:bg-slate-50";
       barra.setAttribute("aria-label", `${mes.etiqueta}: ${dinero(totalMes(mes))}`);
 
       const pila = document.createElement("div");
-      pila.className = "flex min-h-0 flex-1 flex-col justify-end overflow-hidden";
-      [[mes.repuestos, "bg-neutral-500"], [mes.mano_obra, "bg-red-600"]].forEach(([valor, color]) => {
+      pila.className = "flex min-h-0 flex-1 flex-col justify-end overflow-hidden rounded-t-lg";
+      [[mes.repuestos, "bg-slate-300"], [mes.mano_obra, "bg-gradient-to-t from-red-600 to-red-500"]].forEach(([valor, color]) => {
         const tramo = document.createElement("div");
         tramo.className = "w-full " + color;
         tramo.style.height = (valor / maximo * 100) + "%";
@@ -128,7 +150,7 @@
       });
 
       const etiqueta = document.createElement("span");
-      etiqueta.className = "mt-1 block text-center text-xs text-slate-600";
+      etiqueta.className = "mt-2 block text-center text-xs font-medium text-slate-500";
       etiqueta.textContent = mes.etiqueta.split(" ")[0];
 
       barra.append(pila, etiqueta);

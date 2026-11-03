@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Inicio{% endblock %} · {{ TALLER.nombre }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    // Se aplica antes de dibujar la página, para que el menú contraído no "salte" al cargar.
+    if (localStorage.getItem("menuColapsado") === "1") {
+      document.documentElement.classList.add("menu-colapsado");
+    }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     // TEMA BLANCO Y ROJO.
@@ -13,6 +23,10 @@
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            // Inter si hay Internet; si no, la fuente del sistema.
+            sans: ["Inter", "ui-sans-serif", "system-ui", "Segoe UI", "sans-serif"],
+          },
           colors: {
             blue: {
               50: "#fef2f2", 100: "#fee2e2", 200: "#fecaca", 300: "#fca5a5", 400: "#f87171",
@@ -25,91 +39,228 @@
   </script>
   <style>
     input[type="checkbox"] { accent-color: #dc2626; }
+
+    /* Latido suave del resplandor rojo, para el botón más importante de cada pantalla. */
+    @keyframes latido-rojo {
+      0%, 100% { box-shadow: 0 10px 25px -8px rgba(220, 38, 38, .45), 0 0 0 0 rgba(239, 68, 68, .35); }
+      50%      { box-shadow: 0 12px 30px -6px rgba(220, 38, 38, .6),  0 0 0 6px rgba(239, 68, 68, 0); }
+    }
+    .btn-latido { animation: latido-rojo 2.6s ease-in-out infinite; }
+    .btn-latido:hover { animation: none; }
+
+    /* MENÚ LATERAL: al pasar el mouse, la opción se llena de rojo suave de izquierda a derecha. */
+    .enlace-menu:not([aria-current]) {
+      background-image: linear-gradient(to right, #fee2e2, #fff5f5);
+      background-repeat: no-repeat;
+      background-position: left center;
+      background-size: 0% 100%;
+    }
+    .enlace-menu:not([aria-current]):hover { background-size: 100% 100%; }
+
+    /* MENÚ CONTRAÍDO (solo en pantallas medianas o grandes): quedan solo los iconos. */
+    @media (min-width: 768px) {
+      html.menu-colapsado #barra { width: 6rem; }
+      /* Contraído, los iconos se ven más grandes para que se reconozcan de un vistazo. */
+      html.menu-colapsado #barra .enlace-menu svg { width: 1.75rem; height: 1.75rem; stroke-width: 1.7; }
+      html.menu-colapsado #barra .boton-salir svg { width: 1.35rem; height: 1.35rem; }
+      html.menu-colapsado #barra .solo-abierto { display: none; }
+      html.menu-colapsado #barra .cabecera-menu { flex-direction: column; padding-left: .75rem; padding-right: .75rem; }
+      html.menu-colapsado #barra .nav-menu { padding-left: .75rem; padding-right: .75rem; }
+      html.menu-colapsado #barra .enlace-menu { justify-content: center; padding: .75rem; }
+      /* El contador pasa a ser una burbuja sobre el icono. */
+      html.menu-colapsado #barra .conteo-menu {
+        position: absolute; top: .2rem; right: .2rem;
+        min-width: 1.1rem; padding: 0 .25rem; font-size: 9px; line-height: 1.1rem;
+      }
+      html.menu-colapsado #barra .tarjeta-usuario { padding: .6rem; }
+      html.menu-colapsado #barra .tarjeta-usuario .fila-usuario { justify-content: center; }
+      html.menu-colapsado #barra .boton-salir { padding-left: .5rem; padding-right: .5rem; }
+      html.menu-colapsado #alternar-menu svg { transform: rotate(180deg); }
+    }
+
+    /* Quien tenga activada la opción del sistema "reducir movimiento" no ve animaciones. */
+    @media (prefers-reduced-motion: reduce) {
+      .btn, .btn::before, .btn-latido, .enlace-menu, #barra { animation: none !important; transition: none !important; }
+    }
   </style>
   <style type="text/tailwindcss">
-    /* Los botones y tarjetas solo cambian de color y sombra al pasar el mouse.
-       No se agrandan ni se mueven: eso hacía que temblaran ("se trabaran") en el borde. */
     @layer components {
-      .campo { @apply mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 transition-colors focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30; }
-      .etiqueta { @apply block text-sm font-medium text-neutral-700; }
-      .tarjeta { @apply rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm; }
-      .btn { @apply inline-block cursor-pointer select-none rounded-xl px-4 py-2 text-center text-sm font-semibold transition-colors duration-150; }
-      .btn-primario { @apply btn bg-red-600 text-white shadow-md shadow-red-600/30 hover:bg-red-700 active:bg-red-800; }
-      .btn-secundario { @apply btn border border-neutral-300 bg-white text-neutral-700 hover:border-red-500 hover:text-red-700; }
-      .btn-peligro { @apply btn border border-red-300 bg-white text-red-700 hover:bg-red-50; }
-      .enlace { @apply text-red-600 hover:text-red-700 hover:underline; }
+      .campo { @apply mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-all duration-200 focus:border-red-400 focus:outline-none focus:ring-4 focus:ring-red-500/10; }
+      .etiqueta { @apply block text-sm font-medium tracking-tight text-slate-700; }
+      .tarjeta { @apply rounded-2xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/60 transition-all duration-300 hover:shadow-md; }
+
+      /* BOTONES CON MOVIMIENTO.
+         El movimiento ocurre DENTRO del botón (brillo, relleno, resplandor): el botón no se
+         desplaza, así nunca "tiembla" bajo el puntero. Al hacer clic se hunde un poco. */
+      .btn { @apply relative isolate inline-flex cursor-pointer select-none items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-center text-sm font-semibold tracking-tight transition-all duration-300 ease-out active:scale-[0.97]; }
+      .btn:disabled { @apply pointer-events-none opacity-50; }
+
+      /* Rojo: un brillo recorre el botón y aparece un resplandor rojo alrededor. */
+      .btn-primario { @apply btn bg-gradient-to-b from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:from-red-500 hover:to-red-700 hover:shadow-xl hover:shadow-red-500/50 hover:ring-4 hover:ring-red-500/20; }
+      .btn-primario::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;  /* Por encima del fondo rojo, por debajo del texto. */
+        background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, .45) 50%, transparent 75%);
+        transform: translateX(-110%);
+        transition: transform .7s ease;
+      }
+      .btn-primario:hover::before { transform: translateX(110%); }
+
+      /* Blancos: se llenan de rojo de izquierda a derecha y el texto pasa a blanco. */
+      .btn-acento { @apply btn border border-red-200 bg-white text-red-700 shadow-lg shadow-red-500/10 hover:border-red-600 hover:text-white hover:shadow-red-500/40; }
+      .btn-secundario { @apply btn border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-red-600 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
+      .btn-peligro { @apply btn border border-red-200 bg-white text-red-700 shadow-sm hover:border-red-700 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
+      .btn-acento, .btn-secundario, .btn-peligro {
+        background-image: linear-gradient(to right, #dc2626, #ef4444);
+        background-repeat: no-repeat;
+        background-position: left center;
+        background-size: 0% 100%;
+      }
+      .btn-acento:hover, .btn-secundario:hover, .btn-peligro:hover { background-size: 100% 100%; }
+
+      .enlace { @apply font-medium text-red-600 transition-colors hover:text-red-700 hover:underline hover:underline-offset-4; }
     }
   </style>
 </head>
-{% macro enlace_menu(href, texto, activo, conteo_estado=none) %}
-  <a href="{{ href }}" {% if activo %}aria-current="page"{% endif %}
-     class="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-150 {{ 'bg-red-600 font-semibold text-white shadow-md shadow-red-600/30' if activo else 'text-neutral-600 hover:bg-red-50 hover:text-red-700' }}">
-    <span>{{ texto }}</span>
+
+{# Iconos de la barra lateral (trazos de Heroicons, 24x24). #}
+{% set ICONOS = {
+  'panel': 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z',
+  'precio': 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3zM6 6h.008v.008H6V6z',
+  'pendiente': 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+  'proceso': 'M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085',
+  'completado': 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  'todas': 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
+  'nueva': 'M12 4.5v15m7.5-7.5h-15',
+  'clientes': 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
+  'vehiculos': 'M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12',
+  'lista': 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  'usuarios': 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+  'actividad': 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
+  'salir': 'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75',
+  'flecha': 'M15.75 19.5L8.25 12l7.5-7.5',
+} %}
+
+{% macro icono(nombre, clases='h-5 w-5') %}
+  <svg class="{{ clases }} shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ ICONOS[nombre] }}"/></svg>
+{% endmacro %}
+
+{# Enlace del menú: el activo se marca con fondo rojo suave y una barra roja a la izquierda.
+   Al pasar el mouse, se llena de rojo y el icono se agranda y gira un poco. #}
+{% macro enlace_menu(href, texto, activo, conteo_estado=none, icono_nombre='todas') %}
+  <a href="{{ href }}" title="{{ texto }}" {% if activo %}aria-current="page"{% endif %}
+     class="enlace-menu group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm tracking-tight transition-all duration-300 ease-out active:scale-[0.97]
+            {{ 'bg-red-50 font-semibold text-red-700 shadow-sm shadow-red-500/10 before:absolute before:-left-3 before:top-1/2 before:h-6 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-red-600' if activo else 'font-medium text-slate-600 hover:text-red-700' }}">
+    <span class="inline-flex transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110 {{ 'text-red-600' if activo else 'text-slate-400 group-hover:text-red-600' }}">{{ icono(icono_nombre, 'h-[22px] w-[22px]') }}</span>
+    <span class="solo-abierto flex-1 whitespace-nowrap">{{ texto }}</span>
     {% if conteo_estado %}
-      <span class="min-w-6 rounded-full px-2 py-0.5 text-center text-xs font-bold {{ 'bg-white text-red-600' if activo else 'bg-red-600 text-white' }}" data-conteo="{{ conteo_estado }}">{{ nav_conteos[conteo_estado] }}</span>
+      <span class="conteo-menu min-w-6 rounded-full px-2 py-0.5 text-center text-[11px] font-bold tabular-nums transition-colors {{ 'bg-red-600 text-white shadow-sm shadow-red-500/40' if activo else 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-100 group-hover:bg-red-600 group-hover:text-white' }}" data-conteo="{{ conteo_estado }}">{{ nav_conteos[conteo_estado] }}</span>
     {% endif %}
   </a>
 {% endmacro %}
-<body class="min-h-screen bg-neutral-50 text-neutral-900 md:flex">
+
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased md:flex">
   {% set pantalla = request.endpoint %}
   {% set vista = request.args.get('estado', '') %}
   {# Sin sesión iniciada (pantalla de ingreso) no se muestra el menú. #}
   {% if usuario %}
-  <aside class="flex flex-col border-r border-neutral-200 bg-white md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto">
-    <div class="flex items-center gap-3 border-b border-neutral-100 p-5">
-      <span class="grid h-9 w-9 place-items-center rounded-lg bg-red-600 text-lg shadow-md shadow-red-600/30" aria-hidden="true">🔧</span>
-      <a href="{{ url_for('inicio') }}" class="text-lg font-extrabold uppercase tracking-wide text-neutral-900">{{ TALLER.nombre }}</a>
+  <aside id="barra" class="flex flex-col border-r border-slate-100 bg-white md:sticky md:top-0 md:h-screen md:w-72 md:shrink-0 md:overflow-y-auto md:overflow-x-hidden md:transition-[width] md:duration-300 md:ease-out">
+    <div class="cabecera-menu flex items-center gap-3 px-6 pb-4 pt-6">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="" class="h-11 w-11 shrink-0 rounded-xl shadow-lg shadow-red-500/30" width="44" height="44">
+      <a href="{{ url_for('inicio') }}" class="solo-abierto flex-1 text-[15px] font-extrabold uppercase leading-tight tracking-wide text-slate-900">{{ TALLER.nombre }}</a>
+      {# Flechita para contraer o expandir el menú (solo en pantallas medianas o grandes). #}
+      <button id="alternar-menu" type="button" aria-expanded="true" aria-controls="barra" title="Contraer menú"
+              class="hidden h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-300 hover:border-red-300 hover:bg-red-50 hover:text-red-600 active:scale-90 md:grid">
+        <span class="sr-only">Contraer o expandir el menú</span>
+        {{ icono('flecha', 'h-4 w-4 transition-transform duration-300') }}
+      </button>
     </div>
-    <nav class="flex-1 space-y-6 px-3 py-5" aria-label="Menú principal">
+
+    <nav class="nav-menu flex-1 space-y-7 px-6 py-4" aria-label="Menú principal">
       {% if es_dueno %}
         <div class="space-y-1">
-          {{ enlace_menu(url_for('inicio'), 'Panel', pantalla == 'inicio') }}
+          {{ enlace_menu(url_for('inicio'), 'Panel', pantalla == 'inicio', icono_nombre='panel') }}
         </div>
       {% endif %}
       <div class="space-y-1">
-        <p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-red-600">Órdenes de trabajo</p>
+        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Órdenes de trabajo</p>
         {% if es_dueno %}
-          {{ enlace_menu(url_for('ordenes', estado='sin_precio'), 'Falta poner precio', pantalla == 'ordenes' and vista == 'sin_precio', 'sin_precio') }}
+          {{ enlace_menu(url_for('ordenes', estado='sin_precio'), 'Falta poner precio', pantalla == 'ordenes' and vista == 'sin_precio', 'sin_precio', 'precio') }}
         {% endif %}
-        {{ enlace_menu(url_for('ordenes', estado='Pendiente'), 'Pendientes', pantalla == 'ordenes' and vista == 'Pendiente', 'Pendiente') }}
-        {{ enlace_menu(url_for('ordenes', estado='En Proceso'), 'En proceso', pantalla == 'ordenes' and vista == 'En Proceso', 'En Proceso') }}
+        {{ enlace_menu(url_for('ordenes', estado='Pendiente'), 'Pendientes', pantalla == 'ordenes' and vista == 'Pendiente', 'Pendiente', 'pendiente') }}
+        {{ enlace_menu(url_for('ordenes', estado='En Proceso'), 'En proceso', pantalla == 'ordenes' and vista == 'En Proceso', 'En Proceso', 'proceso') }}
         {# El empleado solo ve lo que tiene que trabajar; el historial completo es del dueño. #}
         {% if es_dueno %}
-          {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado') }}
-          {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio')) }}
+          {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado', 'completado') }}
+          {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio'), icono_nombre='todas') }}
         {% endif %}
-        {{ enlace_menu(url_for('orden_nueva'), '+ Nueva orden', pantalla == 'orden_nueva') }}
+        {{ enlace_menu(url_for('orden_nueva'), '+ Nueva orden', pantalla == 'orden_nueva', icono_nombre='nueva') }}
       </div>
       <div class="space-y-1">
-        <p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-red-600">{{ 'Administración' if es_dueno else 'Registro' }}</p>
-        {{ enlace_menu(url_for('clientes'), 'Clientes', pantalla in ('clientes', 'cliente_nuevo', 'cliente_detalle', 'cliente_editar')) }}
-        {{ enlace_menu(url_for('vehiculos'), 'Vehículos', pantalla in ('vehiculos', 'vehiculo_detalle', 'vehiculo_editar')) }}
+        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ 'Administración' if es_dueno else 'Registro' }}</p>
+        {{ enlace_menu(url_for('clientes'), 'Clientes', pantalla in ('clientes', 'cliente_nuevo', 'cliente_detalle', 'cliente_editar'), icono_nombre='clientes') }}
+        {{ enlace_menu(url_for('vehiculos'), 'Vehículos', pantalla in ('vehiculos', 'vehiculo_detalle', 'vehiculo_editar'), icono_nombre='vehiculos') }}
         {% if es_dueno %}
-          {{ enlace_menu(url_for('catalogo'), 'Lista de precios', pantalla == 'catalogo') }}
-          {{ enlace_menu(url_for('usuarios'), 'Usuarios', pantalla == 'usuarios') }}
-          {{ enlace_menu(url_for('actividad'), 'Actividad', pantalla == 'actividad') }}
+          {{ enlace_menu(url_for('catalogo'), 'Lista de precios', pantalla == 'catalogo', icono_nombre='lista') }}
+          {{ enlace_menu(url_for('usuarios'), 'Usuarios', pantalla == 'usuarios', icono_nombre='usuarios') }}
+          {{ enlace_menu(url_for('actividad'), 'Actividad', pantalla == 'actividad', icono_nombre='actividad') }}
         {% endif %}
       </div>
     </nav>
-    <div class="border-t border-neutral-100 p-4">
-      <p class="text-sm font-semibold text-neutral-900">{{ usuario.nombre }}</p>
-      <p class="mb-3 text-xs text-neutral-500">{{ NOMBRES_ROL[usuario.rol] }} · {{ usuario.usuario }}</p>
-      <form method="post" action="{{ url_for('logout') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="btn-secundario w-full" type="submit">Cerrar sesión</button>
-      </form>
+
+    {# Tarjeta flotante del usuario. Contraída, queda solo la inicial y el botón de salir. #}
+    <div class="p-4">
+      <div class="tarjeta-usuario rounded-2xl border border-slate-100 bg-gradient-to-b from-white to-slate-50 p-4 shadow-lg shadow-slate-200/70 transition-all duration-300">
+        <div class="fila-usuario mb-3 flex items-center gap-3">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-red-500 to-red-700 text-sm font-bold uppercase text-white shadow-md shadow-red-500/30" title="{{ usuario.nombre }}" aria-hidden="true">{{ usuario.nombre[:1] }}</span>
+          <div class="solo-abierto min-w-0">
+            <p class="truncate text-sm font-semibold tracking-tight text-slate-900">{{ usuario.nombre }}</p>
+            <p class="truncate text-xs text-slate-500">{{ NOMBRES_ROL[usuario.rol] }} · {{ usuario.usuario }}</p>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="boton-salir btn-secundario w-full" type="submit" title="Cerrar sesión">{{ icono('salir', 'h-4 w-4') }}<span class="solo-abierto">Cerrar sesión</span></button>
+        </form>
+      </div>
     </div>
   </aside>
   {% endif %}
 
   <div class="min-w-0 flex-1">
-    <main class="mx-auto max-w-6xl px-4 py-6 md:px-8">
+    <main class="mx-auto max-w-6xl px-4 py-8 md:px-10">
       {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
-        <div class="mb-4 rounded-lg border p-3 text-sm {{ 'border-red-200 bg-red-50 text-red-800' if categoria == 'error' else 'border-green-200 bg-green-50 text-green-800' }}" role="status">{{ mensaje }}</div>
+        <div class="mb-5 flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-sm {{ 'border-red-100 bg-red-50/80 text-red-800' if categoria == 'error' else 'border-emerald-100 bg-emerald-50/80 text-emerald-800' }}" role="status">
+          <span class="mt-0.5 h-2 w-2 shrink-0 rounded-full {{ 'bg-red-500' if categoria == 'error' else 'bg-emerald-500' }}" aria-hidden="true"></span>
+          <span>{{ mensaje }}</span>
+        </div>
       {% endfor %}
       {% block contenido %}{% endblock %}
     </main>
   </div>
+
+  {% if usuario %}
+    <script>
+      // Flechita del menú: contrae o expande, y recuerda la elección en este navegador.
+      (() => {
+        const boton = document.getElementById("alternar-menu");
+        const raiz = document.documentElement;
+        const actualizar = () => {
+          const colapsado = raiz.classList.contains("menu-colapsado");
+          boton.setAttribute("aria-expanded", String(!colapsado));
+          boton.title = colapsado ? "Expandir menú" : "Contraer menú";
+        };
+        boton.addEventListener("click", () => {
+          const colapsado = raiz.classList.toggle("menu-colapsado");
+          localStorage.setItem("menuColapsado", colapsado ? "1" : "0");
+          actualizar();
+        });
+        actualizar();
+      })();
+    </script>
+  {% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>
