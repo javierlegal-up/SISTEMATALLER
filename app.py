@@ -16,6 +16,8 @@ from pathlib import Path
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import exportar_excel
+
 from flask import (
     Flask,
     abort,
@@ -25,6 +27,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -57,6 +60,9 @@ INTERVALO_RESPALDO = timedelta(minutes=15)
 # El panel avisa al dueño si pasan estos días sin una copia fuera de la compu.
 DIAS_AVISO_COPIA_EXTERNA = 3
 PATRON_RESPALDO = "taller_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].db"
+# Además de la copia .db (la que sirve para restaurar), se guarda una copia en Excel
+# para leer o imprimir. Va en la carpeta "respaldos_excel", junto a "respaldos".
+PATRON_EXCEL = "taller_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].xlsx"
 
 ESTADOS = ("Pendiente", "En Proceso", "Completado")
 TIPOS = ("Repuesto", "Servicio")  # "Servicio" es lo que se suma como mano de obra.
@@ -64,6 +70,7 @@ MAXIMO_IMPORTE = Decimal("999999999")
 MAXIMA_CANTIDAD = Decimal("100000")
 DIAS_ATRASO = 7  # Una orden abierta con más días que estos se marca como atrasada.
 ATRASADAS_EN_PANEL = 4  # Cuántas órdenes atrasadas se muestran en el panel.
+MAS_FACTURADO_EN_PANEL = 5  # Cuántos repuestos/servicios del mes se muestran en el panel.
 POR_PAGINA = 15  # Filas por página en las listas, para evitar el scroll largo.
 
 # Usuarios. El dueño ve todo; el empleado registra autos y trabajos, pero no ve
@@ -243,6 +250,9 @@ app.config.update(
     BUSCAR_PENDRIVE=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
+app.config["RESPALDOS_EXCEL"] = os.environ.get(
+    "TALLER_RESPALDOS_EXCEL", str(Path(app.config["RESPALDOS"]).parent / "respaldos_excel")
+)
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +379,24 @@ def crear_respaldo(actualizar=False):
     return destino
 
 
+def crear_respaldo_excel(origen=None):
+    """Guarda la copia del día en Excel (respaldos_excel/taller_AAAA-MM-DD.xlsx) y devuelve su ruta.
+
+    `origen` es la copia .db recién hecha (así el Excel coincide con ella); sin origen,
+    se exporta la base actual. Se conservan los últimos MAXIMO_RESPALDOS días.
+    """
+    carpeta = Path(app.config["RESPALDOS_EXCEL"])
+    carpeta.mkdir(parents=True, exist_ok=True)
+    destino = carpeta / f"taller_{date.today().isoformat()}.xlsx"
+    exportar_excel.exportar(origen or app.config["DATABASE"], destino)
+    for antiguo in sorted(carpeta.glob(PATRON_EXCEL))[:-MAXIMO_RESPALDOS]:
+        try:
+            antiguo.unlink()
+        except OSError:
+            pass  # Si está abierto en Excel, se borra en otra ocasión.
+    return destino
+
+
 def carpetas_en_pendrives():
     """Carpetas CARPETA_PENDRIVE en la raíz de cualquier unidad conectada (D: a Z:)."""
     if os.name != "nt" or not app.config["BUSCAR_PENDRIVE"]:
@@ -392,8 +420,8 @@ def archivo_estado_externo():
     return Path(app.config["RESPALDOS"]) / ".ultima_copia_externa"
 
 
-def copiar_a_destinos_externos(archivo):
-    """Copia un respaldo al pendrive y a las carpetas extra. Devuelve (copiados, errores)."""
+def copiar_a_destinos_externos(archivo, excel=None):
+    """Copia un respaldo (y su Excel) al pendrive y a las carpetas extra. Devuelve (copiados, errores)."""
     copiados, errores = [], []
     destinos = [Path(carpeta) for carpeta in app.config["RESPALDOS_EXTRA"]] + carpetas_en_pendrives()
     for carpeta in destinos:
@@ -404,6 +432,15 @@ def copiar_a_destinos_externos(archivo):
             os.replace(temporal, carpeta / archivo.name)
             for antiguo in sorted(carpeta.glob(PATRON_RESPALDO))[:-MAXIMO_RESPALDOS]:
                 antiguo.unlink()
+            if excel:
+                carpeta_excel = carpeta / "Excel"
+                carpeta_excel.mkdir(exist_ok=True)
+                try:
+                    shutil.copy2(excel, carpeta_excel / excel.name)
+                    for antiguo in sorted(carpeta_excel.glob(PATRON_EXCEL))[:-MAXIMO_RESPALDOS]:
+                        antiguo.unlink()
+                except OSError as error:  # Por ejemplo, si el Excel del pendrive está abierto.
+                    errores.append(f"{carpeta_excel} (Excel): {error}")
             copiados.append(carpeta)
         except OSError as error:
             errores.append(f"{carpeta}: {error}")
@@ -431,7 +468,12 @@ def respaldar(actualizar=False):
         destino = crear_respaldo(actualizar)
         if destino is None:
             return [], []
-        return copiar_a_destinos_externos(destino)
+        try:
+            excel = crear_respaldo_excel(destino)
+        except Exception as error:  # Sin Excel se sigue: la copia .db es la importante.
+            print(f"ATENCIÓN: no se pudo guardar la copia en Excel: {error}")
+            excel = None
+        return copiar_a_destinos_externos(destino, excel)
 
 
 def respaldar_sin_fallar(actualizar=False):
@@ -485,9 +527,29 @@ def respaldo_ahora():
     return redirect(url_for("inicio"))
 
 
+@app.route("/respaldo/excel")
+@solo_dueno
+def respaldo_excel():
+    """Genera ahora el Excel con todos los datos y lo descarga (también queda en respaldos_excel)."""
+    try:
+        with candado_respaldo:
+            excel = crear_respaldo_excel()
+    except (OSError, sqlite3.Error) as error:
+        flash(f"No se pudo crear el Excel: {error}", "error")
+        return redirect(url_for("inicio"))
+    registrar("Descargó los datos en Excel", excel.name)
+    return send_file(excel, as_attachment=True, download_name=excel.name)
+
+
 def ultimo_respaldo():
     """Fecha ISO de la copia más reciente, o None si no hay ninguna."""
     archivos = sorted(Path(app.config["RESPALDOS"]).glob(PATRON_RESPALDO))
+    return archivos[-1].stem.removeprefix("taller_") if archivos else None
+
+
+def ultimo_excel():
+    """Fecha ISO del Excel más reciente, o None si no hay ninguno."""
+    archivos = sorted(Path(app.config["RESPALDOS_EXCEL"]).glob(PATRON_EXCEL))
     return archivos[-1].stem.removeprefix("taller_") if archivos else None
 
 
@@ -797,6 +859,222 @@ def actividad():
         mes_anterior=rango_de_mes(1),
         paginacion=paginacion,
     )
+
+
+# ---------------------------------------------------------------------------
+# Reporte trimestral (para el dueño): gráficos por mes y versión para PDF
+# ---------------------------------------------------------------------------
+# Un color por persona en los gráficos (se repiten si hay más personas que colores).
+METRICAS_EQUIPO = ("gestionadas", "creadas", "cambios", "clientes")
+COLORES_GRAFICO = ("#dc2626", "#0f172a", "#f59e0b", "#64748b", "#10b981", "#6366f1", "#f472b6", "#a16207")
+
+
+def leer_trimestre(texto):
+    """'2026-4' -> (2026, 4). Si falta o no es válido, el trimestre en curso."""
+    encontrado = re.fullmatch(r"(\d{4})-([1-4])", texto or "")
+    if encontrado:
+        return int(encontrado[1]), int(encontrado[2])
+    hoy = date.today()
+    return hoy.year, (hoy.month - 1) // 3 + 1
+
+
+def trimestre_vecino(anio, trimestre, paso):
+    """El trimestre `paso` lugares antes (negativo) o después (positivo)."""
+    indice = anio * 4 + trimestre - 1 + paso
+    return indice // 4, indice % 4 + 1
+
+
+def meses_del_trimestre(anio, trimestre):
+    primero = (trimestre - 1) * 3 + 1
+    return [(f"{anio}-{mes:02d}", f"{NOMBRES_MES[mes - 1]} {anio}") for mes in range(primero, primero + 3)]
+
+
+def taller_por_mes(meses):
+    """Órdenes y dinero del taller mes a mes. Lo facturado cuenta en el mes en que se completó."""
+    db = get_db()
+    claves = (meses[0][0], meses[-1][0])
+    ingresadas = {
+        fila["mes"]: fila["total"]
+        for fila in db.execute(
+            """SELECT substr(fecha_ingreso, 1, 7) AS mes, COUNT(*) AS total FROM ordenes
+               WHERE substr(fecha_ingreso, 1, 7) BETWEEN ? AND ? GROUP BY mes""",
+            claves,
+        )
+    }
+    completadas = {
+        fila["mes"]: fila
+        for fila in db.execute(
+            """SELECT substr(o.fecha_completado, 1, 7) AS mes,
+                      COUNT(DISTINCT o.id) AS completadas,
+                      COALESCE(SUM(i.subtotal_centavos), 0) AS cobrado,
+                      COALESCE(SUM(CASE WHEN i.tipo = 'Servicio' THEN i.subtotal_centavos END), 0) AS mano_obra,
+                      COALESCE(SUM(i.costo_total_centavos), 0) AS costo,
+                      COUNT(CASE WHEN i.tipo = 'Repuesto' AND i.subtotal_centavos > 0
+                                      AND i.costo_total_centavos IS NULL THEN 1 END) AS sin_costo
+               FROM ordenes o LEFT JOIN orden_items i ON i.orden_id = o.id
+               WHERE o.estado = 'Completado' AND substr(o.fecha_completado, 1, 7) BETWEEN ? AND ?
+               GROUP BY mes""",
+            claves,
+        )
+    }
+    filas = []
+    for clave, etiqueta in meses:
+        datos = completadas.get(clave)
+        fila = {
+            "etiqueta": etiqueta,
+            "ingresadas": ingresadas.get(clave, 0),
+            "completadas": datos["completadas"] if datos else 0,
+            "cobrado": datos["cobrado"] if datos else 0,
+            "mano_obra": datos["mano_obra"] if datos else 0,
+            "costo": datos["costo"] if datos else 0,
+            "sin_costo": datos["sin_costo"] if datos else 0,
+        }
+        fila["ganancia"] = fila["cobrado"] - fila["costo"]
+        filas.append(fila)
+    return filas
+
+
+def sumar_filas(filas):
+    campos = ("ingresadas", "completadas", "cobrado", "mano_obra", "costo", "sin_costo", "ganancia")
+    return {campo: sum(fila[campo] for fila in filas) for campo in campos}
+
+
+def variacion(actual, anterior):
+    """Cambio porcentual contra el período anterior; None si antes no hubo nada."""
+    if not anterior:
+        return None
+    return round((actual - anterior) * 100 / abs(anterior))
+
+
+def equipo_por_mes(meses):
+    """Rendimiento de cada persona mes a mes (solo acciones de producción)."""
+    db = get_db()
+    marcadores = ", ".join("?" for _ in ACCIONES_PRODUCCION)
+    condicion = f"""a.accion IN ({marcadores}) AND a.usuario_id IS NOT NULL
+                    AND substr(a.momento, 1, 7) BETWEEN ? AND ?"""
+    parametros = (*ACCIONES_PRODUCCION, meses[0][0], meses[-1][0])
+    metricas = """SUM(a.accion = 'Creó la orden') AS creadas,
+                  COUNT(DISTINCT a.orden_id) AS gestionadas,
+                  SUM(a.accion = 'Cambió el estado') AS cambios,
+                  SUM(a.accion = 'Registró un cliente') AS clientes"""
+    por_mes = {
+        (fila["usuario_id"], fila["mes"]): fila
+        for fila in db.execute(
+            f"""SELECT a.usuario_id, substr(a.momento, 1, 7) AS mes, {metricas}
+                FROM actividad a WHERE {condicion} GROUP BY a.usuario_id, mes""",
+            parametros,
+        )
+    }
+    # El total del trimestre se calcula aparte: una orden trabajada en dos meses cuenta una vez.
+    totales = {
+        fila["usuario_id"]: fila
+        for fila in db.execute(
+            f"SELECT a.usuario_id, {metricas} FROM actividad a WHERE {condicion} GROUP BY a.usuario_id",
+            parametros,
+        )
+    }
+    personas = []
+    for usuario in db.execute("SELECT id, nombre, rol, activo FROM usuarios ORDER BY nombre COLLATE NOCASE"):
+        total = totales.get(usuario["id"])
+        if not usuario["activo"] and total is None:
+            continue  # Un usuario dado de baja solo aparece si trabajó en el trimestre.
+        mensual = {
+            metrica: [
+                (por_mes[(usuario["id"], clave)][metrica] or 0) if (usuario["id"], clave) in por_mes else 0
+                for clave, _ in meses
+            ]
+            for metrica in METRICAS_EQUIPO
+        }
+        personas.append({
+            "id": usuario["id"],
+            "nombre": usuario["nombre"],
+            "rol": usuario["rol"],
+            "meses": mensual["gestionadas"],
+            "mensual": mensual,
+            "creadas": total["creadas"] if total else 0,
+            "gestionadas": total["gestionadas"] if total else 0,
+            "cambios": total["cambios"] if total else 0,
+            "clientes": total["clientes"] if total else 0,
+        })
+    personas.sort(key=lambda p: (-p["gestionadas"], -p["creadas"], p["nombre"].lower()))
+    for posicion, persona in enumerate(personas):
+        persona["color"] = COLORES_GRAFICO[posicion % len(COLORES_GRAFICO)]
+    # Quién rindió más cada mes (puede haber empate; sin actividad, nadie).
+    mejores = []
+    for indice in range(len(meses)):
+        maximo = max((p["meses"][indice] for p in personas), default=0)
+        mejores.append([p["nombre"] for p in personas if maximo and p["meses"][indice] == maximo])
+    return personas, mejores
+
+
+def datos_reporte(anio, trimestre):
+    """Todo lo que muestra el reporte trimestral, en pantalla y en el PDF.
+
+    Los gráficos los dibuja el navegador (static/graficos.js) con los datos de "graficos".
+    """
+    meses = meses_del_trimestre(anio, trimestre)
+    taller = taller_por_mes(meses)
+    total = sumar_filas(taller)
+    anterior = sumar_filas(taller_por_mes(meses_del_trimestre(*trimestre_vecino(anio, trimestre, -1))))
+    personas, mejores = equipo_por_mes(meses)
+    con_trabajo = [p for p in personas if p["gestionadas"]]
+    return {
+        "anio": anio,
+        "trimestre": trimestre,
+        "clave": f"{anio}-{trimestre}",
+        "titulo": f"{trimestre}.º trimestre {anio}",
+        "meses": [etiqueta for _, etiqueta in meses],
+        "taller": taller,
+        "total": total,
+        "anterior": anterior,
+        "variaciones": {
+            campo: variacion(total[campo], anterior[campo])
+            for campo in ("ingresadas", "completadas", "cobrado", "ganancia")
+        },
+        "personas": personas,
+        "mejores": mejores,
+        "destacado": con_trabajo[0] if con_trabajo else None,
+        "graficos": {
+            "meses": [etiqueta.split()[0] for _, etiqueta in meses],
+            "personas": [
+                {
+                    "nombre": p["nombre"],
+                    "color": p["color"],
+                    "mensual": p["mensual"],
+                    "totales": {metrica: p[metrica] for metrica in METRICAS_EQUIPO},
+                }
+                for p in personas
+            ],
+            "taller": {
+                campo: [fila[campo] for fila in taller]
+                for campo in ("ingresadas", "completadas", "cobrado", "mano_obra", "costo", "ganancia")
+            },
+        },
+        "anterior_clave": "{}-{}".format(*trimestre_vecino(anio, trimestre, -1)),
+        "siguiente_clave": "{}-{}".format(*trimestre_vecino(anio, trimestre, 1)),
+        "actual": leer_trimestre(None),
+        "es_actual": (anio, trimestre) == leer_trimestre(None),
+        "es_futuro": (anio, trimestre) > leer_trimestre(None),
+        "generado": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+@app.route("/reportes")
+@solo_dueno
+def reportes():
+    """Reporte trimestral: cómo le fue al taller y a cada persona, mes a mes."""
+    reporte = datos_reporte(*leer_trimestre(request.args.get("trimestre")))
+    if reporte["es_futuro"]:
+        return redirect(url_for("reportes"))
+    return render_template("reportes.html", reporte=reporte)
+
+
+@app.route("/reportes/imprimir")
+@solo_dueno
+def reporte_imprimir():
+    """Versión A4 del reporte, para imprimir o guardar como PDF desde el navegador."""
+    reporte = datos_reporte(*leer_trimestre(request.args.get("trimestre")))
+    return render_template("reporte_imprimir.html", reporte=reporte)
 
 
 # ---------------------------------------------------------------------------
@@ -1119,11 +1397,37 @@ def resumen_panel():
             (f"{meses[0][0]}-01",),
         )
     }
+    hoy = date.today().isoformat()
+    movimiento_hoy = db.execute(
+        """SELECT COALESCE(SUM(fecha_ingreso = ?), 0) AS ingresadas,
+                  COALESCE(SUM(estado = 'Completado' AND fecha_completado = ?), 0) AS completadas
+           FROM ordenes""",
+        (hoy, hoy),
+    ).fetchone()
+    # Lo que más se facturó en las órdenes completadas este mes (sin repuestos del cliente).
+    mas_facturado = [
+        dict(fila)
+        for fila in db.execute(
+            """SELECT i.descripcion, i.tipo,
+                      COUNT(DISTINCT o.id) AS ordenes,
+                      SUM(i.subtotal_centavos) AS total
+               FROM orden_items i JOIN ordenes o ON o.id = i.orden_id
+               WHERE o.estado = 'Completado' AND substr(o.fecha_completado, 1, 7) = ?
+                 AND i.del_cliente = 0 AND i.subtotal_centavos > 0
+               GROUP BY i.tipo, i.descripcion
+               ORDER BY total DESC, ordenes DESC
+               LIMIT ?""",
+            (meses[-1][0], MAS_FACTURADO_EN_PANEL),
+        )
+    ]
     return {
         "conteos": conteos,
         "abiertas": conteos["Pendiente"] + conteos["En Proceso"],
         "atrasadas": atrasadas,
         "valor_abierto": valor_abierto,
+        "ingresadas_hoy": movimiento_hoy["ingresadas"],
+        "completadas_hoy": movimiento_hoy["completadas"],
+        "mas_facturado": mas_facturado,
         "meses": [
             {
                 "etiqueta": etiqueta,
@@ -1133,6 +1437,73 @@ def resumen_panel():
             }
             for clave, etiqueta in meses
         ],
+    }
+
+
+def ganancias_panel():
+    """Ganancia de las órdenes completadas esta semana (desde el lunes) y este mes.
+
+    Ganancia = lo cobrado (repuestos + mano de obra) menos tu costo de los repuestos.
+    Igual que en cada orden, un costo no cargado cuenta como 0 y se avisa.
+    """
+    db = get_db()
+    hoy = date.today()
+    inicio_semana = (hoy - timedelta(days=hoy.weekday())).isoformat()
+    inicio_mes = hoy.replace(day=1).isoformat()
+    desde = min(inicio_semana, inicio_mes)  # La semana puede empezar en el mes anterior.
+
+    filas = db.execute(
+        """SELECT o.id AS orden_id, o.fecha_completado, o.vehiculo_id,
+                  v.patente, v.marca, v.modelo,
+                  COALESCE(SUM(CASE WHEN i.tipo = 'Servicio' THEN i.subtotal_centavos END), 0) AS mano_obra,
+                  COALESCE(SUM(i.subtotal_centavos), 0) AS cobrado,
+                  COALESCE(SUM(i.costo_total_centavos), 0) AS costo,
+                  COUNT(CASE WHEN i.tipo = 'Repuesto' AND i.subtotal_centavos > 0
+                                  AND i.costo_total_centavos IS NULL THEN 1 END) AS sin_costo
+           FROM ordenes o
+           JOIN vehiculos v ON v.id = o.vehiculo_id
+           LEFT JOIN orden_items i ON i.orden_id = o.id
+           WHERE o.estado = 'Completado' AND o.fecha_completado >= ?
+           GROUP BY o.id""",
+        (desde,),
+    ).fetchall()
+
+    def periodo_vacio():
+        return {"ordenes": 0, "cobrado": 0, "costo": 0, "mano_obra": 0, "ganancia": 0, "sin_costo": 0}
+
+    semana, mes, vehiculos = periodo_vacio(), periodo_vacio(), {}
+    for fila in filas:
+        ganancia = fila["cobrado"] - fila["costo"]
+        periodos = []
+        if fila["fecha_completado"] >= inicio_semana:
+            periodos.append(semana)
+        if fila["fecha_completado"] >= inicio_mes:
+            periodos.append(mes)
+            vehiculo = vehiculos.setdefault(fila["vehiculo_id"], {
+                "id": fila["vehiculo_id"],
+                "patente": fila["patente"],
+                "descripcion": f"{fila['marca']} {fila['modelo']}".strip(),
+                "ordenes": 0, "cobrado": 0, "ganancia": 0, "ganancia_semana": 0,
+            })
+            vehiculo["ordenes"] += 1
+            vehiculo["cobrado"] += fila["cobrado"]
+            vehiculo["ganancia"] += ganancia
+            if fila["fecha_completado"] >= inicio_semana:
+                vehiculo["ganancia_semana"] += ganancia
+        for periodo in periodos:
+            periodo["ordenes"] += 1
+            periodo["cobrado"] += fila["cobrado"]
+            periodo["costo"] += fila["costo"]
+            periodo["mano_obra"] += fila["mano_obra"]
+            periodo["ganancia"] += ganancia
+            periodo["sin_costo"] += fila["sin_costo"]
+
+    return {
+        "semana": semana,
+        "mes": mes,
+        "inicio_semana": inicio_semana,
+        "mes_clave": inicio_mes[:7],
+        "vehiculos": sorted(vehiculos.values(), key=lambda v: v["ganancia"], reverse=True),
     }
 
 
@@ -1170,9 +1541,12 @@ def inicio():
         "index.html",
         atrasadas=atrasadas,
         resumen=resumen_panel(),
+        ganancias=ganancias_panel(),
         dias_atraso=DIAS_ATRASO,
         respaldo_ok=respaldo_ok,
         ultimo_respaldo=ultimo_respaldo(),
+        ultimo_excel=ultimo_excel(),
+        carpeta_excel=app.config["RESPALDOS_EXCEL"],
         copia_externa=copia_externa.strftime("%d/%m/%Y %H:%M") if copia_externa else None,
         aviso_copia_externa=(
             copia_externa is None

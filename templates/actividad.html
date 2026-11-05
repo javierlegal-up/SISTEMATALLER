@@ -9,11 +9,16 @@
 {% endmacro %}
 
 {% block contenido %}
-  <h1 class="text-2xl font-semibold">Actividad</h1>
-  <p class="mb-5 mt-1 text-sm text-neutral-500">
-    Trabajo de {{ persona.nombre if persona else 'todo el equipo' }}
-    del <strong>{{ desde.strftime('%d/%m/%Y') }}</strong> al <strong>{{ hasta.strftime('%d/%m/%Y') }}</strong>.
-  </p>
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold">Actividad</h1>
+      <p class="mt-1 text-sm text-neutral-500">
+        Trabajo de {{ persona.nombre if persona else 'todo el equipo' }}
+        del <strong>{{ desde.strftime('%d/%m/%Y') }}</strong> al <strong>{{ hasta.strftime('%d/%m/%Y') }}</strong>.
+      </p>
+    </div>
+    <a class="btn-acento" href="{{ url_for('reportes') }}">Ver gráficos del trimestre y PDF</a>
+  </div>
 
   {# Filtros: persona, período y, opcionalmente, acciones administrativas. #}
   <form method="get" class="tarjeta mb-5 space-y-3">

@@ -26,6 +26,7 @@ from app import (  # noqa: E402
     crear_usuario,
     init_db,
     resumen_panel,
+    ganancias_panel,
     ultimo_respaldo,
 )
 
@@ -224,9 +225,48 @@ class RecorridoCompleto(unittest.TestCase):
         self.assertEqual(ahora["meses"][-1]["repuestos"], antes["meses"][-1]["repuestos"] + 300100)
         self.assertEqual(ahora["meses"][-1]["mano_obra"], antes["meses"][-1]["mano_obra"] + 300000)
         self.assertEqual(ahora["abiertas"], antes["abiertas"] - 1)
+        self.assertEqual(ahora["completadas_hoy"], antes["completadas_hoy"] + 1)
+        self.assertTrue(ahora["mas_facturado"])
+        self.assertIn("Lo más facturado este mes", self.pagina("/"))
+
+        # La orden completada hoy suma a la ganancia de la semana, del mes y de su vehículo.
+        with app.app_context():
+            ganancias = ganancias_panel()
+        for periodo in (ganancias["semana"], ganancias["mes"]):
+            self.assertEqual(periodo["ganancia"], periodo["cobrado"] - periodo["costo"])
+            self.assertGreaterEqual(periodo["cobrado"], 600100)
+        self.assertIn("TAB666", [v["patente"] for v in ganancias["vehiculos"]])
+        self.assertIn("Tu ganancia", self.pagina("/"))
 
         self.assertEqual(self.cliente.post(url, data={"estado": "Inventado"}).status_code, 400)
         self.assertEqual(self.cliente.post("/api/ordenes/999999/estado", data={"estado": "Pendiente"}).status_code, 404)
+
+    def test_12b_respaldo_en_excel(self):
+        import zipfile
+        from xml.dom.minidom import parseString
+
+        self.cliente.post("/clientes/nuevo", data=datos_cliente("Eva <Excel> & Cía", "XLS123"))
+        self.crear_orden(self.vehiculo_id("XLS123"))
+
+        respuesta = self.cliente.get("/respaldo/excel")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("attachment", respuesta.headers["Content-Disposition"])
+        excel = Path(app.config["RESPALDOS_EXCEL"]) / f"taller_{date.today().isoformat()}.xlsx"
+        self.assertTrue(excel.exists())
+        with zipfile.ZipFile(excel) as archivo:
+            nombres = archivo.namelist()
+            for nombre in nombres:
+                if nombre.endswith((".xml", ".rels")):
+                    parseString(archivo.read(nombre))  # Todo el XML debe estar bien formado.
+            hojas = "".join(archivo.read(n).decode("utf-8") for n in nombres if n.startswith("xl/worksheets/"))
+        self.assertIn("XLS123", hojas)
+        self.assertIn("Eva &lt;Excel&gt; &amp; Cía", hojas)
+        self.assertNotIn("pbkdf2", hojas)  # Nunca contraseñas (ni cifradas).
+        self.assertNotIn("scrypt", hojas)
+
+        # El empleado no puede descargarlo.
+        self.entrar_como(EMPLEADO_ID)
+        self.assertNotEqual(self.cliente.get("/respaldo/excel").status_code, 200)
 
     def test_13_orden_vieja_se_marca_atrasada(self):
         self.cliente.post("/clientes/nuevo", data=datos_cliente("Gil Sosa", "ATR777"))
@@ -696,6 +736,71 @@ class RecorridoCompleto(unittest.TestCase):
         self.assertIn("No hay actividad en este período", vacio)
         # Sin persona elegida aparece la comparación de todo el equipo.
         self.assertIn("Rendimiento por persona", self.pagina("/actividad"))
+
+    def test_32_reporte_trimestral_con_graficos_y_pdf(self):
+        from app import datos_reporte, leer_trimestre, trimestre_vecino
+
+        self.cliente.post("/clientes/nuevo", data=datos_cliente("Rita Paz", "REP111"))
+        self.entrar_como(EMPLEADO_ID)
+        self.cliente.post(
+            "/ordenes/nueva",
+            data={
+                "vehiculo_id": self.vehiculo_id("REP111"),
+                "fallas": "Service",
+                "estado": "Pendiente",
+                "fecha_ingreso": date.today().isoformat(),
+                "item_tipo": ["Servicio"],
+                "item_descripcion": ["Service completo"],
+                "item_cantidad": ["1"],
+            },
+        )
+        orden_id = self.ultima_orden_id()
+        self.entrar_como(DUENO_ID)
+        self.cliente.post(f"/ordenes/{orden_id}/estado", data={"estado": "Completado"})
+
+        anio, trimestre = leer_trimestre(None)
+        primero = (trimestre - 1) * 3 + 1
+        conexion = conectar()
+        try:
+            completadas = conexion.execute(
+                """SELECT COUNT(*) AS total FROM ordenes WHERE estado = 'Completado'
+                   AND substr(fecha_completado, 1, 7) BETWEEN ? AND ?""",
+                (f"{anio}-{primero:02d}", f"{anio}-{primero + 2:02d}"),
+            ).fetchone()["total"]
+        finally:
+            conexion.close()
+
+        texto = self.pagina("/reportes")
+        self.assertIn(f"{trimestre}.º trimestre {anio}", texto)
+        self.assertIn("Juan Empleado", texto)
+        self.assertIn('id="datos-reporte"', texto)  # Datos para los gráficos interactivos.
+        self.assertIn("graficos.js", texto)
+        self.assertIn(f'data-total="completadas">{completadas}<', texto)
+        self.assertGreaterEqual(completadas, 1)
+
+        impresion = self.pagina(f"/reportes/imprimir?trimestre={anio}-{trimestre}")
+        self.assertIn("Guardar como PDF", impresion)
+        self.assertIn("Juan Empleado", impresion)
+
+        # Un trimestre sin datos carga en cero; uno futuro vuelve al actual.
+        self.assertIn('data-total="ingresadas">0<', self.pagina("/reportes?trimestre=2000-1"))
+        self.assertEqual(self.cliente.get("/reportes?trimestre=2999-1").status_code, 302)
+
+        self.entrar_como(EMPLEADO_ID)
+        for ruta in ("/reportes", "/reportes/imprimir"):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.cliente.get(ruta).status_code, 403)
+
+        # Cambio de trimestre y datos que reciben los gráficos.
+        self.assertEqual(trimestre_vecino(2026, 1, -1), (2025, 4))
+        self.assertEqual(trimestre_vecino(2026, 4, 1), (2027, 1))
+        self.assertEqual(leer_trimestre("2026-9"), leer_trimestre(None))  # Inválido: el actual.
+        with app.app_context():
+            datos = datos_reporte(anio, trimestre)["graficos"]
+        self.assertEqual(len(datos["meses"]), 3)
+        self.assertEqual(sum(datos["taller"]["completadas"]), completadas)
+        juan = next(p for p in datos["personas"] if p["nombre"] == "Juan Empleado")
+        self.assertGreaterEqual(sum(juan["mensual"]["creadas"]), 1)
 
     # --- Ayudas ---
     def lineas(self, orden_id):

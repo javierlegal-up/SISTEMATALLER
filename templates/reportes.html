@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}Reportes{% endblock %}
+
+{% block contenido %}
+  {% set r = reporte %}
+  <header class="mb-8 flex flex-wrap items-end justify-between gap-5">
+    <div>
+      <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Reporte trimestral</p>
+      <h1 class="mt-1 text-3xl font-semibold tracking-tight">{{ r.titulo }}</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        {{ r.meses[0] }} – {{ r.meses[-1] }}{% if r.es_actual %} · <span class="text-red-600">en curso</span>{% endif %}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      {# Selector de trimestre: año con flechas y los cuatro trimestres como pastillas. #}
+      {% set flecha = 'con-onda grid h-8 w-8 place-items-center rounded-full text-base font-semibold text-slate-400 transition-all duration-300 hover:bg-red-50 hover:text-red-600 hover:shadow-sm active:scale-90' %}
+      <nav class="inline-flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1 text-sm shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-red-500/10" aria-label="Elegir trimestre">
+        <a class="{{ flecha }} hover:-translate-x-0.5"
+           href="{{ url_for('reportes', trimestre=(r.anio - 1)|string + '-' + r.trimestre|string) }}" title="Año anterior">‹</a>
+        <span class="px-1 text-xs font-bold tabular-nums text-slate-700">{{ r.anio }}</span>
+        {% for t in range(1, 5) %}
+          {% set futuro = (r.anio, t) > r.actual %}
+          {% if futuro %}
+            <span class="cursor-not-allowed rounded-full px-3 py-1.5 text-xs font-medium text-slate-300" title="Todavía no empezó">T{{ t }}</span>
+          {% elif t == r.trimestre %}
+            <span class="trimestre-activo rounded-full bg-gradient-to-b from-red-500 to-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-red-500/40" aria-current="page">T{{ t }}</span>
+          {% else %}
+            <a href="{{ url_for('reportes', trimestre=r.anio|string + '-' + t|string) }}"
+               class="con-onda rounded-full px-3 py-1.5 text-xs font-medium text-slate-500 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-50 hover:text-red-600 hover:shadow-sm active:scale-90">T{{ t }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if (r.anio + 1, 1) <= r.actual %}
+          <a class="{{ flecha }} hover:translate-x-0.5"
+             href="{{ url_for('reportes', trimestre=(r.anio + 1)|string + '-' + r.trimestre|string) }}" title="Año siguiente">›</a>
+        {% else %}
+          <span class="grid h-8 w-8 cursor-not-allowed place-items-center text-base text-slate-200">›</span>
+        {% endif %}
+      </nav>
+      <style>
+        /* El trimestre elegido "aparece" con un pequeño rebote al cargar la página. */
+        .trimestre-activo { animation: aparecer-trimestre .5s cubic-bezier(.34, 1.56, .64, 1); }
+        @keyframes aparecer-trimestre { from { transform: scale(.6); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .trimestre-activo { animation: none; } }
+      </style>
+
+      <a class="btn-primario btn-latido group !rounded-full" href="{{ url_for('reporte_imprimir', trimestre=r.clave) }}" target="_blank" rel="noopener">
+        <svg class="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+        PDF
+      </a>
+    </div>
+  </header>
+
+  {% include "_reporte_contenido.html" %}
+{% endblock %}
