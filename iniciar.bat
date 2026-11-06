@@ -40,6 +40,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Copia local de los estilos, para no depender de un servidor ajeno. Si falla, se usa el de Internet.
+if not exist "static\tailwind.js" (
+    echo Descargando los estilos del sistema...
+    "venv\Scripts\python.exe" descargar_tailwind.py
+)
+
 echo.
 echo Taller San Cayetano en marcha: http://127.0.0.1:5000
 echo NO cierres esta ventana mientras uses el sistema.

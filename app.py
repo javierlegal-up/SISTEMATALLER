@@ -2,6 +2,8 @@
 
 Ejecutar con:  python app.py   y abrir http://127.0.0.1:5000
 """
+import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -9,6 +11,7 @@ import shutil
 import sqlite3
 import string
 import threading
+import time
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
@@ -76,7 +79,41 @@ POR_PAGINA = 15  # Filas por página en las listas, para evitar el scroll largo.
 # Usuarios. El dueño ve todo; el empleado registra autos y trabajos, pero no ve
 # precios, costos ni el panel, no borra nada y no puede completar órdenes.
 NOMBRES_ROL = {"dueno": "Dueño (administrador)", "empleado": "Empleado"}
-LARGO_MINIMO_CLAVE = 4
+LARGO_MINIMO_CLAVE = 8
+# Tras tantos intentos fallidos de entrar con un usuario, se bloquea ese usuario un rato.
+MAXIMO_INTENTOS_LOGIN = 5
+BLOQUEO_LOGIN = timedelta(minutes=5)
+# Si nadie usa la sesión durante este tiempo, se cierra sola (por si queda la compu abierta).
+INACTIVIDAD_MAXIMA = timedelta(minutes=60)
+# Tailwind (los estilos). Si está descargado en static/ se usa esa copia (no depende de
+# Internet ni de un servidor ajeno); si no, se usa el de Internet. Para descargarlo:
+#   venv\Scripts\python.exe descargar_tailwind.py   (iniciar.bat lo hace solo)
+TAILWIND_CDN = "https://cdn.tailwindcss.com"
+TAILWIND_LOCAL = Path(__file__).resolve().parent / "static" / "tailwind.js"
+
+
+def tailwind_local():
+    return TAILWIND_LOCAL.is_file() and TAILWIND_LOCAL.stat().st_size > 0
+
+
+def politica_contenido():
+    """Qué puede cargar el navegador. Bloquea que la página se meta en otro sitio
+    o mande datos a servidores ajenos."""
+    scripts = "'self' 'unsafe-inline'" + ("" if tailwind_local() else f" {TAILWIND_CDN}")
+    return "; ".join((f"script-src {scripts}",) + POLITICA_CONTENIDO_FIJA)
+
+
+POLITICA_CONTENIDO_FIJA = (
+    "default-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+)
 # En el registro de actividad, lo hecho antes de esta hora es del turno mañana.
 HORA_CAMBIO_TURNO = 14
 # Acciones de producción: las que muestra Actividad y cuentan para el rendimiento.
@@ -249,6 +286,7 @@ app.config.update(
     RESPALDOS_EXTRA=list(CARPETAS_EXTRA),
     BUSCAR_PENDRIVE=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_HTTPONLY=True,
 )
 app.config["RESPALDOS_EXCEL"] = os.environ.get(
     "TALLER_RESPALDOS_EXCEL", str(Path(app.config["RESPALDOS"]).parent / "respaldos_excel")
@@ -575,6 +613,9 @@ def datos_plantillas():
         "ESTADOS": ESTADOS,
         "TIPOS": TIPOS,
         "TALLER": TALLER,
+        "TAILWIND_JS": (
+            url_for("static", filename="tailwind.js") if tailwind_local() else TAILWIND_CDN
+        ),
         "usuario": g.get("usuario"),
         "es_dueno": es_dueno(),
         "NOMBRES_ROL": NOMBRES_ROL,
@@ -606,14 +647,89 @@ def cargar_usuario():
         g.usuario = db.execute(
             "SELECT * FROM usuarios WHERE id = ? AND activo = 1", (usuario_id,)
         ).fetchone()
+        ahora = time.time()
+        ultimo_uso = session.get("ultimo_uso", ahora)
         if g.usuario is None:
             session.pop("usuario_id", None)  # Usuario desactivado: se cierra su sesión.
+        elif session.get("huella_clave") != huella_clave(g.usuario):
+            # Le cambiaron la contraseña: las sesiones abiertas con la anterior se cierran.
+            g.usuario = None
+            session.clear()
+        elif ahora - ultimo_uso > INACTIVIDAD_MAXIMA.total_seconds():
+            g.usuario = None
+            session.clear()
+            flash("La sesión se cerró por falta de uso. Vuelve a entrar.", "error")
+        else:
+            session["ultimo_uso"] = ahora
 
     if g.usuario is None and request.endpoint not in RUTAS_PUBLICAS:
         if request.path.startswith("/api/"):
             return jsonify(error="La sesión se cerró. Vuelve a iniciar sesión."), 401
         return redirect(url_for("login"))
     return None
+
+
+@app.after_request
+def cabeceras_seguridad(respuesta):
+    respuesta.headers.setdefault("Content-Security-Policy", politica_contenido())
+    respuesta.headers.setdefault("X-Frame-Options", "DENY")
+    respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
+    respuesta.headers.setdefault("Referrer-Policy", "same-origin")
+    if request.endpoint != "static":
+        # Las páginas tienen datos de clientes: que el navegador no las guarde
+        # (así "Atrás" después de cerrar sesión no las vuelve a mostrar).
+        respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+def huella_clave(usuario):
+    """Marca de la contraseña actual, guardada en la sesión. Cambia si se cambia la contraseña.
+
+    Se firma con la clave secreta para no exponer el hash en la cookie.
+    """
+    return hmac.new(
+        app.secret_key.encode(), usuario["clave_hash"].encode(), hashlib.sha256
+    ).hexdigest()[:32]
+
+
+def iniciar_sesion(usuario):
+    session.clear()
+    session["usuario_id"] = usuario["id"]
+    session["huella_clave"] = huella_clave(usuario)
+    session["ultimo_uso"] = time.time()
+
+
+# Intentos fallidos de entrar: usuario (en minúsculas) -> [fallos, bloqueado_hasta].
+intentos_login = {}
+candado_intentos = threading.Lock()
+
+
+def segundos_de_bloqueo(usuario):
+    """Segundos que faltan para poder volver a intentar con ese usuario (0 si no está bloqueado)."""
+    with candado_intentos:
+        estado = intentos_login.get(usuario.lower())
+        if estado is None:
+            return 0
+        return max(0, int(estado[1] - time.time()))
+
+
+def anotar_intento_fallido(usuario):
+    ahora = time.time()
+    with candado_intentos:
+        if len(intentos_login) > 1000:  # Que la lista no crezca sin fin.
+            for clave in [c for c, (_f, hasta) in intentos_login.items() if hasta < ahora]:
+                del intentos_login[clave]
+        estado = intentos_login.setdefault(usuario.lower(), [0, 0])
+        estado[0] += 1
+        if estado[0] >= MAXIMO_INTENTOS_LOGIN:
+            estado[0] = 0
+            estado[1] = ahora + BLOQUEO_LOGIN.total_seconds()
+            print(f"ATENCIÓN: demasiados intentos fallidos con el usuario «{usuario}»: bloqueado un rato.")
+
+
+def olvidar_intentos(usuario):
+    with candado_intentos:
+        intentos_login.pop(usuario.lower(), None)
 
 
 @app.errorhandler(403)
@@ -656,9 +772,8 @@ def configuracion_inicial():
         if not errores:
             with db:
                 usuario_id = crear_usuario(db, datos["usuario"], datos["nombre"], clave, "dueno")
-            session.clear()
-            session["usuario_id"] = usuario_id
             g.usuario = db.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+            iniciar_sesion(g.usuario)
             registrar("Creó la cuenta del dueño")
             flash("Cuenta creada. Ahora puedes crear los usuarios de tus empleados en Usuarios.", "ok")
             return redirect(url_for("inicio"))
@@ -672,13 +787,23 @@ def login():
     error, usuario_escrito = None, ""
     if request.method == "POST":
         usuario_escrito = request.form.get("usuario", "").strip()
+        espera = segundos_de_bloqueo(usuario_escrito)
+        if espera:
+            minutos = max(1, (espera + 59) // 60)
+            error = (
+                "Demasiados intentos fallidos con este usuario. "
+                f"Espera {minutos} {'minuto' if minutos == 1 else 'minutos'} y vuelve a intentarlo."
+            )
+            return render_template("login.html", error=error, usuario_escrito=usuario_escrito)
         fila = get_db().execute(
             "SELECT * FROM usuarios WHERE usuario = ? AND activo = 1", (usuario_escrito,)
         ).fetchone()
         if fila is not None and check_password_hash(fila["clave_hash"], request.form.get("clave", "")):
-            session.clear()
-            session["usuario_id"] = fila["id"]
+            olvidar_intentos(usuario_escrito)
+            iniciar_sesion(fila)
+            g.usuario = fila
             return redirect(pagina_de_inicio())
+        anotar_intento_fallido(usuario_escrito)
         error = "Usuario o contraseña incorrectos."
     return render_template("login.html", error=error, usuario_escrito=usuario_escrito)
 
@@ -728,6 +853,9 @@ def usuario_cambiar_clave(usuario_id):
                 "UPDATE usuarios SET clave_hash = ? WHERE id = ?",
                 (generate_password_hash(clave), usuario_id),
             )
+        if usuario_id == g.usuario["id"]:
+            # Cambió la suya: sigue dentro (las demás sesiones con la clave vieja se cierran).
+            iniciar_sesion(obtener_o_404("usuarios", usuario_id))
         registrar("Cambió una contraseña", usuario["nombre"])
         flash(f"Contraseña de {usuario['nombre']} cambiada.", "ok")
     return redirect(url_for("usuarios"))

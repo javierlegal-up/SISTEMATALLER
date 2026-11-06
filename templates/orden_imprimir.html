@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- El navegador usa este título como nombre sugerido al guardar en PDF. -->
   <title>{{ orden.id|num_ot }} - {{ orden.patente }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="{{ TAILWIND_JS }}"></script>
   <style>
     @page { size: A4; margin: 15mm; }
     tr, .sin-corte { break-inside: avoid; }

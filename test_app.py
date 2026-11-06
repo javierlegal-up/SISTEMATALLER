@@ -24,7 +24,9 @@ from app import (  # noqa: E402
     conectar,
     crear_respaldo,
     crear_usuario,
+    huella_clave,
     init_db,
+    intentos_login,
     resumen_panel,
     ganancias_panel,
     ultimo_respaldo,
@@ -59,12 +61,19 @@ def datos_cliente(nombre, *patentes):
 class RecorridoCompleto(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
+        intentos_login.clear()
         self.cliente = app.test_client()
         self.entrar_como(DUENO_ID)  # Salvo que la prueba diga otra cosa, entra el dueño.
 
-    def entrar_como(self, usuario_id):
-        with self.cliente.session_transaction() as sesion:
+    def entrar_como(self, usuario_id, cliente=None):
+        conexion = conectar()
+        try:
+            usuario = conexion.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+        finally:
+            conexion.close()
+        with (cliente or self.cliente).session_transaction() as sesion:
             sesion["usuario_id"] = usuario_id
+            sesion["huella_clave"] = huella_clave(usuario)
 
     def crear_orden(self, vehiculo_id, **extra):
         datos = {
@@ -645,12 +654,17 @@ class RecorridoCompleto(unittest.TestCase):
             self.assertIn("/configuracion-inicial", respuesta.headers["Location"])
             errores = cliente.post(
                 "/configuracion-inicial",
-                data={"nombre": "Roberto", "usuario": "roberto", "clave": "1234", "clave2": "4321"},
+                data={"nombre": "Roberto", "usuario": "roberto", "clave": "1234", "clave2": "1234"},
+            ).get_data(as_text=True)
+            self.assertIn("al menos 8 caracteres", errores)  # Contraseña demasiado corta.
+            errores = cliente.post(
+                "/configuracion-inicial",
+                data={"nombre": "Roberto", "usuario": "roberto", "clave": "12345678", "clave2": "87654321"},
             ).get_data(as_text=True)
             self.assertIn("no coinciden", errores)
             creada = cliente.post(
                 "/configuracion-inicial",
-                data={"nombre": "Roberto", "usuario": "roberto", "clave": "1234", "clave2": "1234"},
+                data={"nombre": "Roberto", "usuario": "roberto", "clave": "12345678", "clave2": "12345678"},
             )
             self.assertTrue(creada.headers["Location"].endswith("/"))
             self.assertEqual(cliente.get("/").status_code, 200)  # Quedó como dueño con sesión iniciada.
@@ -661,7 +675,7 @@ class RecorridoCompleto(unittest.TestCase):
     def test_30_usuarios_se_desactivan_y_no_pueden_entrar(self):
         self.cliente.post(
             "/usuarios",
-            data={"nombre": "Pedro Tarde", "usuario": "pedro", "rol": "empleado", "clave": "abcd", "clave2": "abcd"},
+            data={"nombre": "Pedro Tarde", "usuario": "pedro", "rol": "empleado", "clave": "abcd1234", "clave2": "abcd1234"},
         )
         conexion = conectar()
         try:
@@ -670,7 +684,7 @@ class RecorridoCompleto(unittest.TestCase):
             conexion.close()
         self.cliente.post(f"/usuarios/{pedro_id}/activo")
         otro = app.test_client()
-        texto = otro.post("/login", data={"usuario": "pedro", "clave": "abcd"}).get_data(as_text=True)
+        texto = otro.post("/login", data={"usuario": "pedro", "clave": "abcd1234"}).get_data(as_text=True)
         self.assertIn("Usuario o contraseña incorrectos", texto)
         # El dueño no puede desactivarse a sí mismo.
         self.assertIn(
@@ -801,6 +815,62 @@ class RecorridoCompleto(unittest.TestCase):
         self.assertEqual(sum(datos["taller"]["completadas"]), completadas)
         juan = next(p for p in datos["personas"] if p["nombre"] == "Juan Empleado")
         self.assertGreaterEqual(sum(juan["mensual"]["creadas"]), 1)
+
+    def test_33_protecciones_de_sesion_y_navegador(self):
+        import time
+
+        # Cabeceras de seguridad y páginas que no quedan guardadas en el navegador.
+        respuesta = self.cliente.get("/clientes")
+        politica = respuesta.headers["Content-Security-Policy"]
+        self.assertIn("frame-ancestors 'none'", politica)
+        self.assertIn("connect-src 'self'", politica)
+        # La página carga Tailwind desde donde la política lo permite.
+        from app import TAILWIND_CDN, tailwind_local
+
+        texto = respuesta.get_data(as_text=True)
+        if tailwind_local():
+            self.assertIn('src="/static/tailwind.js"', texto)
+            self.assertNotIn(TAILWIND_CDN, politica)
+        else:
+            self.assertIn(f'src="{TAILWIND_CDN}"', texto)
+            self.assertIn(TAILWIND_CDN, politica)
+        self.assertEqual(respuesta.headers["X-Frame-Options"], "DENY")
+        self.assertEqual(respuesta.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(respuesta.headers["Cache-Control"], "no-store")
+
+        # Tras 5 intentos fallidos el usuario queda bloqueado, aunque luego acierte.
+        otro = app.test_client()
+        for _ in range(5):
+            otro.post("/login", data={"usuario": "dueno", "clave": "mala"})
+        bloqueado = otro.post("/login", data={"usuario": "dueno", "clave": "clave-dueno"})
+        self.assertEqual(bloqueado.status_code, 200)
+        self.assertIn("Demasiados intentos", bloqueado.get_data(as_text=True))
+        intentos_login.clear()
+        self.assertEqual(otro.post("/login", data={"usuario": "dueno", "clave": "clave-dueno"}).status_code, 302)
+
+        # Cambiar la contraseña cierra las sesiones abiertas con la anterior.
+        self.cliente.post(
+            "/usuarios",
+            data={"nombre": "Marta", "usuario": "marta", "rol": "empleado", "clave": "marta-123", "clave2": "marta-123"},
+        )
+        conexion = conectar()
+        try:
+            marta_id = conexion.execute("SELECT id FROM usuarios WHERE usuario = 'marta'").fetchone()["id"]
+        finally:
+            conexion.close()
+        de_marta = app.test_client()
+        self.entrar_como(marta_id, de_marta)
+        self.assertEqual(de_marta.get("/clientes").status_code, 200)
+        self.cliente.post(f"/usuarios/{marta_id}/clave", data={"clave": "marta-456", "clave2": "marta-456"})
+        self.assertIn("/login", de_marta.get("/clientes").headers["Location"])
+        # El dueño que cambia su propia contraseña sigue dentro.
+        self.cliente.post(f"/usuarios/{DUENO_ID}/clave", data={"clave": "clave-dueno", "clave2": "clave-dueno"})
+        self.assertEqual(self.cliente.get("/clientes").status_code, 200)
+
+        # Una sesión sin uso por más de una hora se cierra sola.
+        with self.cliente.session_transaction() as sesion:
+            sesion["ultimo_uso"] = time.time() - 2 * 3600
+        self.assertIn("/login", self.cliente.get("/clientes").headers["Location"])
 
     # --- Ayudas ---
     def lineas(self, orden_id):
