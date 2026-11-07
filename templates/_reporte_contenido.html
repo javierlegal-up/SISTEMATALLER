@@ -42,12 +42,13 @@
 {% endmacro %}
 
 {# 1. Cifras clave, con su tendencia de los tres meses #}
-<div class="mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-200/70 lg:grid-cols-4 print:grid-cols-4">
+<div class="mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-200/70 lg:grid-cols-5 print:grid-cols-5">
   {% for campo, titulo, es_dinero, color in (
        ('ingresadas', 'Órdenes ingresadas', false, '#94a3b8'),
        ('completadas', 'Completadas', false, '#0f172a'),
-       ('cobrado', 'Facturado', true, '#0f172a'),
-       ('ganancia', 'Ganancia', true, '#dc2626')) %}
+       ('cobrado', 'Cobrado', true, '#0f172a'),
+       ('ganancia', 'Margen antes de gastos', true, '#dc2626'),
+       ('resultado_neto', 'Resultado estimado', true, '#b45309')) %}
     <div class="group bg-white p-5 transition-colors duration-300 hover:bg-slate-50/60">
       <div class="flex items-center justify-between gap-2">
         <p class="text-xs font-medium text-slate-500">{{ titulo }}</p>
@@ -93,7 +94,7 @@
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="text-base font-semibold tracking-tight">Taller</h2>
-      <p class="text-xs text-slate-500">Lo facturado cuenta en el mes en que se completó la orden.</p>
+      <p class="text-xs text-slate-500">Cobros y gastos van por fecha del movimiento; el trabajo y sus costos, por fecha de finalización. Las compras de stock se reconocen como costo al consumir el repuesto.</p>
     </div>
     {% if not impresion %}
       <div class="segmentado" role="tablist" id="selector-taller">
@@ -108,11 +109,34 @@
     {% if impresion %}<div class="mt-6 border-t border-slate-100 pt-6" id="grafico-taller-ordenes"></div>{% endif %}
   </div>
   {% if r.total.sin_costo %}
-    <p class="mt-3 text-xs text-amber-700">Hay {{ r.total.sin_costo }} repuesto(s) cobrados sin costo cargado: la ganancia real es algo menor.</p>
+    <p class="mt-3 text-xs text-amber-700">Hay {{ r.total.sin_costo }} repuesto(s) completados sin costo cargado: el margen estimado puede estar sobreestimado.</p>
   {% endif %}
 </section>
 
-{# 4. Detalle en tablas (plegado en pantalla, abierto en el PDF) #}
+{# 4. Cobros y reversiones por medio #}
+<section class="sin-corte mb-8">
+  <div class="mb-4">
+    <h2 class="text-base font-semibold tracking-tight">Cobros por medio</h2>
+    <p class="text-xs text-slate-500">Cobros y reversiones del trimestre, agrupados por fecha del movimiento y medio de pago.</p>
+  </div>
+  <div class="rounded-2xl border border-slate-200/70 bg-white p-5">
+    <div id="grafico-medios"></div>
+    <table class="sr-only" aria-label="Detalle de cobros y reversiones por medio de pago">
+      <thead><tr><th>Medio de pago</th><th>Cobros</th><th>Reversiones</th></tr></thead>
+      <tbody>
+        {% for medio in r.graficos.medios.etiquetas %}
+          <tr>
+            <th scope="row">{{ medio }}</th>
+            <td>{{ r.graficos.medios.cobros[loop.index0]|dinero }}</td>
+            <td>{{ r.graficos.medios.reversiones[loop.index0]|dinero }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# 5. Detalle en tablas (plegado en pantalla, abierto en el PDF) #}
 <details class="group sin-corte rounded-2xl border border-slate-200/70 bg-white" {{ 'open' if impresion }}>
   <summary class="con-onda flex cursor-pointer list-none items-center justify-between rounded-2xl px-5 py-4 text-sm font-semibold tracking-tight text-slate-700 transition-colors duration-300 hover:bg-red-50/60 hover:text-red-600 print:hidden">
     Ver detalle en números
@@ -121,16 +145,19 @@
     </span>
   </summary>
   <div class="space-y-8 overflow-x-auto px-5 pb-5 print:pt-5">
-    <table class="w-full text-left text-sm">
+    <table data-mobile-cards class="w-full text-left text-sm">
       <thead class="text-xs text-slate-400">
         <tr>
           <th class="py-2 pr-3 font-medium">Mes</th>
           <th class="px-3 py-2 text-right font-medium">Ingresadas</th>
           <th class="px-3 py-2 text-right font-medium">Completadas</th>
-          <th class="px-3 py-2 text-right font-medium">Facturado</th>
+          <th class="px-3 py-2 text-right font-medium">Trabajo terminado</th>
+          <th class="px-3 py-2 text-right font-medium">Cobrado</th>
           <th class="px-3 py-2 text-right font-medium">Mano de obra</th>
           <th class="px-3 py-2 text-right font-medium">Costo repuestos</th>
-          <th class="py-2 pl-3 text-right font-medium">Ganancia</th>
+          <th class="px-3 py-2 text-right font-medium">Margen antes de gastos</th>
+          <th class="px-3 py-2 text-right font-medium">Gastos generales</th>
+          <th class="py-2 pl-3 text-right font-medium">Resultado estimado</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100 tabular-nums">
@@ -139,10 +166,13 @@
             <td class="py-2 pr-3">{{ f.etiqueta }}</td>
             <td class="px-3 py-2 text-right">{{ f.ingresadas }}</td>
             <td class="px-3 py-2 text-right">{{ f.completadas }}</td>
+            <td class="px-3 py-2 text-right">{{ f.valor_completado|dinero }}</td>
             <td class="px-3 py-2 text-right">{{ f.cobrado|dinero }}</td>
             <td class="px-3 py-2 text-right">{{ f.mano_obra|dinero }}</td>
             <td class="px-3 py-2 text-right">{{ f.costo|dinero }}</td>
-            <td class="py-2 pl-3 text-right">{{ f.ganancia|dinero }}</td>
+            <td class="px-3 py-2 text-right">{{ f.ganancia|dinero }}</td>
+            <td class="px-3 py-2 text-right">{{ f.gastos|dinero }}</td>
+            <td class="py-2 pl-3 text-right">{{ f.resultado_neto|dinero }}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -151,25 +181,31 @@
           <td class="py-2 pr-3">Trimestre</td>
           <td class="px-3 py-2 text-right">{{ r.total.ingresadas }}</td>
           <td class="px-3 py-2 text-right">{{ r.total.completadas }}</td>
+          <td class="px-3 py-2 text-right">{{ r.total.valor_completado|dinero }}</td>
           <td class="px-3 py-2 text-right">{{ r.total.cobrado|dinero }}</td>
           <td class="px-3 py-2 text-right">{{ r.total.mano_obra|dinero }}</td>
           <td class="px-3 py-2 text-right">{{ r.total.costo|dinero }}</td>
-          <td class="py-2 pl-3 text-right">{{ r.total.ganancia|dinero }}</td>
+          <td class="px-3 py-2 text-right">{{ r.total.ganancia|dinero }}</td>
+          <td class="px-3 py-2 text-right">{{ r.total.gastos|dinero }}</td>
+          <td class="py-2 pl-3 text-right">{{ r.total.resultado_neto|dinero }}</td>
         </tr>
         <tr class="text-xs text-slate-400">
           <td class="py-1 pr-3">Trimestre anterior</td>
           <td class="px-3 py-1 text-right">{{ r.anterior.ingresadas }}</td>
           <td class="px-3 py-1 text-right">{{ r.anterior.completadas }}</td>
+          <td class="px-3 py-1 text-right">{{ r.anterior.valor_completado|dinero }}</td>
           <td class="px-3 py-1 text-right">{{ r.anterior.cobrado|dinero }}</td>
           <td class="px-3 py-1 text-right">{{ r.anterior.mano_obra|dinero }}</td>
           <td class="px-3 py-1 text-right">{{ r.anterior.costo|dinero }}</td>
-          <td class="py-1 pl-3 text-right">{{ r.anterior.ganancia|dinero }}</td>
+          <td class="px-3 py-1 text-right">{{ r.anterior.ganancia|dinero }}</td>
+          <td class="px-3 py-1 text-right">{{ r.anterior.gastos|dinero }}</td>
+          <td class="py-1 pl-3 text-right">{{ r.anterior.resultado_neto|dinero }}</td>
         </tr>
       </tfoot>
     </table>
 
     {% if r.personas %}
-      <table class="w-full text-left text-sm">
+      <table data-mobile-cards class="w-full text-left text-sm">
         <thead class="text-xs text-slate-400">
           <tr>
             <th class="py-2 pr-3 font-medium">Persona</th>
@@ -298,9 +334,11 @@
     // --- Taller ---
     const VISTAS = {
       dinero: { dinero: true, series: [
-        { nombre: "Facturado", color: "#0f172a", valores: datos.taller.cobrado },
-        { nombre: "Mano de obra", color: "#cbd5e1", valores: datos.taller.mano_obra },
-        { nombre: "Ganancia", color: "#dc2626", valores: datos.taller.ganancia },
+        { nombre: "Cobrado", color: "#0f172a", valores: datos.taller.cobrado },
+        { nombre: "Trabajo terminado", color: "#cbd5e1", valores: datos.taller.valor_completado },
+        { nombre: "Margen estimado", color: "#dc2626", valores: datos.taller.ganancia },
+        { nombre: "Gastos generales", color: "#f59e0b", valores: datos.taller.gastos },
+        { nombre: "Resultado estimado", color: "#b45309", valores: datos.taller.resultado_neto },
       ] },
       ordenes: { dinero: false, series: [
         { nombre: "Ingresadas", color: "#cbd5e1", valores: datos.taller.ingresadas },
@@ -319,5 +357,18 @@
         taller.actualizar(vista.series, { dinero: vista.dinero });
       });
     }
+
+    // --- Cobros por medio ---
+    Graficos.barras(document.getElementById("grafico-medios"), {
+      etiquetas: datos.medios.etiquetas,
+      titulos: datos.medios.etiquetas,
+      alto: 230,
+      animar,
+      dinero: true,
+      series: [
+        { nombre: "Cobros", color: "#0f766e", valores: datos.medios.cobros },
+        { nombre: "Reversiones", color: "#dc2626", valores: datos.medios.reversiones },
+      ],
+    });
   })();
 </script>

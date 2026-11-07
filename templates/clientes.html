@@ -2,18 +2,19 @@
 {% from "_macros.html" import paginacion_lista %}
 {% block titulo %}Clientes{% endblock %}
 {% block contenido %}
-  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold">Clientes <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Taller · personas</p><h1 class="mt-1">Clientes <span class="text-base font-medium text-slate-500">({{ paginacion.total }})</span></h1><p class="mt-1 text-sm text-slate-500">Ficha de contacto, vehículos asociados e historial de trabajos.</p></div>
     <a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
-  </div>
+  </header>
 
-  <form method="get" class="mb-4 flex gap-2">
-    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre, teléfono, documento o patente" aria-label="Buscar clientes">
+  <form method="get" class="mb-4 flex flex-wrap gap-2">
+    <input class="campo !mt-0 min-w-56 flex-1" type="search" name="q" value="{{ busqueda }}" placeholder="Nombre, teléfono, documento o patente" aria-label="Buscar clientes">
     <button class="btn-secundario" type="submit">Buscar</button>
+    {% if busqueda %}<a class="btn-secundario" href="{{ url_for('clientes') }}">Limpiar</a>{% endif %}
   </form>
 
   {% if clientes %}
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="clientes-tabla overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-sm">
         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
@@ -35,8 +36,20 @@
         </tbody>
       </table>
     </div>
+    <div class="clientes-movil">
+      {% for c in clientes %}
+        <article class="tarjeta mb-3">
+          <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cliente</p><h2 class="mt-1 text-base font-bold"><a class="enlace" href="{{ url_for('cliente_detalle', cliente_id=c.id) }}">{{ c.nombre }}</a></h2></div><a class="btn-secundario px-3 py-2" href="{{ url_for('cliente_detalle', cliente_id=c.id) }}">Abrir</a></div>
+          <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-sm">
+            <div><dt class="text-xs text-slate-500">Teléfono</dt><dd class="mt-0.5 font-medium">{{ c.telefono or '—' }}</dd></div>
+            <div><dt class="text-xs text-slate-500">Documento</dt><dd class="mt-0.5 font-medium">{{ c.documento or '—' }}</dd></div>
+            <div class="col-span-2"><dt class="text-xs text-slate-500">Patentes</dt><dd class="mt-0.5 font-mono text-xs">{{ c.patentes or 'Sin vehículos registrados' }}</dd></div>
+          </dl>
+        </article>
+      {% endfor %}
+    </div>
     {{ paginacion_lista(paginacion) }}
   {% else %}
-    <p class="tarjeta text-sm text-slate-500">No hay clientes para mostrar.</p>
+    <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">CL</span><h2>{% if busqueda %}No encontramos ese cliente{% else %}Todavía no hay clientes{% endif %}</h2><p>{% if busqueda %}Revisa el nombre, el teléfono, el documento o la patente, o limpia la búsqueda.{% else %}Registra primero a la persona responsable para asociar sus vehículos y órdenes.{% endif %}</p><div class="mt-4 flex gap-2">{% if busqueda %}<a class="btn-secundario" href="{{ url_for('clientes') }}">Limpiar búsqueda</a>{% endif %}<a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a></div></div>
   {% endif %}
 {% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Gastos{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3"><div><p class="text-xs font-medium uppercase tracking-wider text-slate-400">Finanzas</p><h1 class="text-2xl font-semibold">Gastos del taller</h1><p class="mt-1 text-sm text-slate-500">Registra egresos reales; los errores se corrigen con una reversión fechada y un motivo.</p></div><a class="btn-secundario" href="{{ url_for('caja') }}">Ver caja</a></header>
+  {{ lista_errores(errores) }}
+  <form method="post" class="tarjeta mb-6 grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="etiqueta">Fecha<input class="campo" type="date" name="fecha" value="{{ datos.fecha }}" max="{{ hoy_iso }}" required></label>
+    <label class="etiqueta">Rubro<select class="campo" name="categoria" required>{% for r in rubros %}<option {{ 'selected' if datos.categoria == r }}>{{ r }}</option>{% endfor %}</select></label>
+    <label class="etiqueta xl:col-span-2">Concepto<input class="campo" name="concepto" maxlength="180" value="{{ datos.concepto }}" placeholder="Ej.: factura de luz" required></label>
+    <label class="etiqueta">Importe ($)<input class="campo" type="number" name="importe" min="0.01" step="0.01" value="{{ datos.importe }}" required></label>
+    <label class="etiqueta">Medio<select class="campo" name="medio" required><option value="">Seleccionar</option>{% for m in MEDIOS_PAGO %}<option {{ 'selected' if datos.medio == m }}>{{ m }}</option>{% endfor %}</select></label>
+    <label class="etiqueta xl:col-span-2">Comprobante / referencia<input class="campo" name="referencia" maxlength="120" value="{{ datos.referencia }}" placeholder="Opcional"></label>
+    <button class="btn-primario" type="submit">Registrar gasto</button>
+  </form>
+
+  <section class="tarjeta" data-filtro-lista>
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 class="font-semibold">Libro de gastos</h2><p class="mt-1 text-xs text-slate-500">{{ paginacion.total }} movimientos en el historial · {{ reversos }} reversiones registradas.</p></div><p class="text-sm text-slate-500">Gastos brutos históricos: <strong class="text-slate-900">{{ total_gastos|dinero }}</strong></p></div>
+    <form method="get" class="mb-4 grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-6" role="search">
+      <label class="etiqueta xl:col-span-2">Buscar en todo el historial<input id="buscar-gasto" class="campo" type="search" name="q" value="{{ busqueda }}" data-filtro-busqueda placeholder="Concepto, rubro, medio o persona…"></label>
+      <label class="etiqueta">Desde<input class="campo" type="date" name="desde" value="{{ desde }}"></label>
+      <label class="etiqueta">Hasta<input class="campo" type="date" name="hasta" value="{{ hasta }}"></label>
+      <label class="etiqueta">Estado<select class="campo" name="estado"><option value="todos" {{ 'selected' if estado == 'todos' }}>Todos</option><option value="vigentes" {{ 'selected' if estado == 'vigentes' }}>Vigentes</option><option value="revertidos" {{ 'selected' if estado == 'revertidos' }}>Revertidos</option></select></label>
+      <button class="btn-secundario" type="submit">Aplicar filtros</button>
+      {% if busqueda or desde or hasta or estado != 'todos' %}<a class="btn-secundario" href="{{ url_for('gastos') }}">Limpiar</a>{% endif %}
+    </form>
+    <div class="mb-3 flex flex-wrap items-center gap-3"><span class="text-xs text-slate-500">Página {{ paginacion.pagina }} de {{ paginacion.paginas }}</span><span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></div>
+    <div class="overflow-x-auto"><table data-mobile-cards class="w-full text-left text-sm">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-3 py-3">Fecha</th><th class="px-3 py-3">Rubro</th><th class="px-3 py-3">Concepto / referencia</th><th class="px-3 py-3">Medio</th><th class="px-3 py-3">Registró</th><th class="px-3 py-3 text-right">Importe</th><th class="px-3 py-3"></th></tr></thead>
+      <tbody class="divide-y divide-slate-100">{% for g in movimientos %}<tr id="gasto-{{ g.id }}" data-filtro-item data-filtro-grupo="{{ 'revertido' if g.reversion_id else 'vigente' }}" data-filtro-texto="{{ g.fecha }} {{ g.categoria }} {{ g.concepto }} {{ g.referencia }} {{ g.medio }} {{ g.usuario_nombre }} {{ g.motivo_reversion }}">
+        <td class="px-3 py-3 whitespace-nowrap">{{ g.fecha|fecha }}</td><td class="px-3 py-3">{{ g.categoria }}</td><td class="px-3 py-3">{{ g.concepto }}{% if g.referencia %}<span class="block text-xs text-slate-500">{{ g.referencia }}</span>{% endif %}{% if g.reversion_id %}<span class="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">Revertido {{ g.fecha_reversion|fecha }} · {{ g.motivo_reversion }}</span>{% endif %}</td>
+        <td class="px-3 py-3">{{ g.medio }}</td><td class="px-3 py-3">{{ g.usuario_nombre or '—' }}</td><td class="px-3 py-3 text-right font-medium">{{ g.importe_centavos|dinero }}</td>
+        <td class="px-3 py-3 text-right">{% if not g.reversion_id %}<form method="post" action="{{ url_for('gasto_revertir', gasto_id=g.id) }}" class="flex min-w-56 items-center gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input id="revertir-gasto-{{ g.id }}" class="campo !mt-0 px-2 py-1 text-xs" name="motivo" aria-label="Motivo para revertir el gasto" minlength="5" maxlength="500" placeholder="Motivo de reversión" required><button class="text-xs font-semibold text-red-700 hover:underline">Revertir</button></form>{% endif %}</td>
+      </tr>{% else %}<tr><td colspan="7" class="px-3 py-8 text-center text-slate-500">Todavía no hay gastos registrados.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay gastos que coincidan en esta página. Usa los filtros para buscar en todo el historial.</p>
+    {{ paginacion_lista(paginacion) }}
+  </section>
+{% endblock %}

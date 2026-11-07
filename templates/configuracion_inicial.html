@@ -13,8 +13,8 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label class="etiqueta">Tu nombre<input class="campo" name="nombre" value="{{ datos.nombre }}" required></label>
       <label class="etiqueta">Usuario para ingresar<input class="campo" name="usuario" value="{{ datos.usuario }}" placeholder="Ej.: dueno" autocomplete="username" required></label>
-      <label class="etiqueta">Contraseña<input class="campo" type="password" name="clave" autocomplete="new-password" required></label>
-      <label class="etiqueta">Repite la contraseña<input class="campo" type="password" name="clave2" autocomplete="new-password" required></label>
+      <label class="etiqueta">Contraseña (mínimo {{ LARGO_MINIMO_CLAVE }} caracteres)<input class="campo" type="password" name="clave" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" required></label>
+      <label class="etiqueta">Repite la contraseña<input class="campo" type="password" name="clave2" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" required></label>
       <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-950">Anota la contraseña en un lugar seguro. Es la única cuenta que ve los números y crea usuarios.</p>
       <button class="btn-primario w-full" type="submit">Crear cuenta del dueño</button>
     </form>

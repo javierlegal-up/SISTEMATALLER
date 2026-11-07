@@ -1,11 +1,14 @@
 {% from "_macros.html" import estado_badge %}
 {# El empleado no ve importes, no completa órdenes ni reabre las completadas. #}
-{% set puede_anterior = o.anterior and (es_dueno or o.estado != 'Completado') %}
-{% set puede_siguiente = o.siguiente and (es_dueno or o.siguiente != 'Completado') %}
+{% set puede_anterior = not o.anulada and o.anterior and (es_dueno or o.estado != 'Completado') %}
+{% set puede_siguiente = not o.anulada and o.siguiente and (es_dueno or o.siguiente != 'Completado') %}
 <tr class="fila-orden cursor-pointer hover:bg-slate-50"
     data-estado="{{ o.estado }}"
     data-numero="{{ o.id|num_ot }}"
     data-atrasada="{{ '1' if o.atrasada else '0' }}"
+    data-prioridad="{{ o.prioridad }}"
+    data-fecha-prometida="{{ o.fecha_prometida or '' }}"
+    data-texto="{{ o.cliente_nombre }} {{ o.cliente_telefono }} {{ o.patente }} {{ o.marca }} {{ o.modelo }} {{ o.fallas }} {{ o.diagnostico }}"
     data-url-estado="{{ url_for('api_orden_estado', orden_id=o.id) }}"
     data-url-rapida="{{ url_for('orden_rapida', orden_id=o.id) }}">
   <td class="whitespace-nowrap px-4 py-3"><button type="button" class="enlace font-medium">{{ o.id|num_ot }}</button></td>
@@ -13,7 +16,11 @@
   <td class="px-4 py-3"><span class="font-mono">{{ o.patente }}</span><span class="block text-xs text-slate-500">{{ o.marca }} {{ o.modelo }}</span></td>
   <td class="max-w-56 truncate px-4 py-3 text-slate-600" title="{{ o.fallas }}">{{ o.fallas }}</td>
   <td class="whitespace-nowrap px-4 py-3 text-slate-600">
-    {% if o.estado == 'Completado' %}
+    {% if o.fecha_prometida %}<span class="block font-medium {{ 'text-red-700' if o.vencida else 'text-amber-700' if o.vence_hoy else 'text-slate-700' }}">{{ o.fecha_prometida|fecha }}{% if o.vencida %} · vencida{% elif o.vence_hoy %} · hoy{% endif %}</span>{% else %}<span class="block text-slate-400">Sin fecha comprometida</span>{% endif %}
+    <span class="block text-xs">
+    {% if o.anulada %}
+      Anulada
+    {% elif o.estado == 'Completado' %}
       {{ o.fecha_completado|fecha }}
     {% elif o.atrasada %}
       <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Atrasada · {{ o.dias }} días</span>
@@ -22,14 +29,17 @@
     {% else %}
       Hace {{ o.dias }} {{ 'día' if o.dias == 1 else 'días' }}
     {% endif %}
+    </span>
   </td>
-  <td class="px-4 py-3">{{ estado_badge(o.estado) }}</td>
+  <td class="px-4 py-3">{% if o.anulada %}<span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">Anulada</span>{% else %}{{ estado_badge(o.estado) }}<span class="prioridad-badge prioridad-{{ o.prioridad|lower }} ml-1">{{ o.prioridad }}</span>{% endif %}</td>
   {% if es_dueno %}
     <td class="whitespace-nowrap px-4 py-3 text-right font-medium">
       {% if o.lineas_sin_precio %}
         <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Falta precio</span>
-      {% else %}
+      {% elif not o.anulada %}
         {{ o.total|dinero }}
+      {% else %}
+        —
       {% endif %}
     </td>
   {% endif %}

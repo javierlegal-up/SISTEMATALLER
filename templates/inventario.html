@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Inventario{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Compras e inventario</p>
+      <h1 class="text-2xl font-semibold">Inventario</h1>
+      <p class="mt-1 text-sm text-slate-500">Las existencias se calculan desde el historial de recepciones, consumos, ajustes y reversiones.</p>
+    </div>
+    <div class="flex gap-2"><a class="btn-secundario" href="{{ url_for('catalogo') }}">Catálogo</a><a class="btn-primario" href="{{ url_for('compra_nueva') }}">Registrar compra</a></div>
+  </header>
+
+  {% set resumen = namespace(activos=0, bajos=0, archivados=0, sin_movimiento=0) %}
+  {% for articulo in articulos %}
+    {% if articulo.activo %}{% set resumen.activos = resumen.activos + 1 %}{% if articulo.stock_milesimas <= articulo.stock_minimo_milesimas %}{% set resumen.bajos = resumen.bajos + 1 %}{% endif %}{% if not articulo.movimientos_total %}{% set resumen.sin_movimiento = resumen.sin_movimiento + 1 %}{% endif %}{% else %}{% set resumen.archivados = resumen.archivados + 1 %}{% endif %}
+  {% endfor %}
+  <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section class="kpi-operativo"><p>Artículos activos</p><strong>{{ resumen.activos }}</strong><span>Con control de existencias</span></section>
+    <section class="kpi-operativo {{ 'kpi-alerta' if resumen.bajos }}"><p>En punto de reposición</p><strong>{{ resumen.bajos }}</strong><span>Existencia igual o inferior al mínimo</span></section>
+    <section class="kpi-operativo"><p>Valorización de existencias</p><strong>{{ valor_stock_total_centavos|dinero }}</strong><span>Stock activo × costo promedio ponderado</span></section>
+    <section class="kpi-operativo {{ 'kpi-alerta' if resumen.sin_movimiento }}"><p>Sin movimientos registrados</p><strong>{{ resumen.sin_movimiento }}</strong><span>Revisa la carga inicial antes de operar</span></section>
+    <section class="kpi-operativo"><p>Archivados</p><strong>{{ resumen.archivados }}</strong><span>Conservaron su historial</span></section>
+  </div>
+
+  <section class="tarjeta mb-6" data-filtro-lista aria-label="Artículos inventariables">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 class="font-semibold">Artículos inventariables</h2><p class="mt-1 text-xs text-slate-500">El saldo se reconstruye desde movimientos registrados. Los ajustes piden un motivo y conservan el asiento anterior.</p></div><span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></div>
+    <div class="mb-4 grid gap-3 sm:grid-cols-[minmax(14rem,1fr)_auto]">
+      <label class="sr-only" for="buscar-inventario">Buscar en inventario</label><input id="buscar-inventario" class="campo !mt-0" type="search" data-filtro-busqueda placeholder="Artículo o SKU…">
+      <div class="filtros-orden" aria-label="Filtrar artículos">
+        <button type="button" class="filtro-chip filtro-activo" data-filtro-valor="*" aria-pressed="true">Todos</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="bajo" aria-pressed="false">Reponer · {{ resumen.bajos }}</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="sin_movimiento" aria-pressed="false">Sin movimientos · {{ resumen.sin_movimiento }}</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="disponible" aria-pressed="false">Disponibles</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="archivado" aria-pressed="false">Archivados</button>
+      </div>
+    </div>
+    <div class="inventario-articulos-tabla overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500"><tr>
+          <th class="px-3 py-3">Artículo</th><th class="px-3 py-3">SKU</th><th class="px-3 py-3">Unidad</th><th class="px-3 py-3 text-right">Existencia</th><th class="px-3 py-3 text-right">Mínimo</th><th class="px-3 py-3 text-right">Costo promedio</th><th class="px-3 py-3 text-right">Valorización</th><th class="px-3 py-3">Último movimiento</th><th class="px-3 py-3">Estado</th><th class="px-3 py-3">Ajuste por conteo</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for a in articulos %}
+            {% set bajo = a.stock_milesimas <= a.stock_minimo_milesimas %}
+            <tr class="{{ 'bg-amber-50/60' if bajo and a.activo else '' }}" data-filtro-item data-filtro-grupo="{{ 'archivado' if not a.activo else 'bajo' if bajo else 'disponible' }}{{ ' sin_movimiento' if a.activo and not a.movimientos_total else '' }}" data-filtro-texto="{{ a.nombre }} {{ a.sku }} {{ a.unidad }}">
+              <td class="px-3 py-3 font-medium">{{ a.nombre }}{% if not a.activo %}<span class="ml-2 rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-500">Archivado</span>{% endif %}</td>
+              <td class="px-3 py-3 text-slate-500">{{ a.sku or '—' }}</td><td class="px-3 py-3">{{ a.unidad }}</td>
+              <td class="px-3 py-3 text-right font-semibold tabular-nums">{{ a.stock_milesimas|cantidad_stock }}</td><td class="px-3 py-3 text-right tabular-nums">{{ a.stock_minimo_milesimas|cantidad_stock }}</td>
+              <td class="px-3 py-3 text-right tabular-nums">{{ a.costo_promedio_centavos|dinero }}{% if not a.movimientos_total %}<span class="block text-[10px] text-slate-400">Sin costo de movimientos</span>{% endif %}</td>
+              <td class="px-3 py-3 text-right font-semibold tabular-nums">{{ a.valor_stock_centavos|dinero }}</td>
+              <td class="px-3 py-3 whitespace-nowrap text-xs text-slate-500">{{ a.ultimo_movimiento|momento if a.ultimo_movimiento else 'Sin movimientos' }}</td>
+              <td class="px-3 py-3"><span class="rounded-full px-2 py-1 text-xs {{ 'bg-amber-100 text-amber-800' if bajo and a.activo else 'bg-emerald-50 text-emerald-700' if a.activo else 'bg-slate-100 text-slate-500' }}">{{ 'Reponer' if bajo and a.activo else 'Disponible' if a.activo else 'Archivado' }}</span></td>
+              <td class="px-3 py-3">
+                {% if a.activo %}
+                  <form method="post" action="{{ url_for('inventario_ajustar', articulo_id=a.id) }}" class="flex min-w-64 items-end gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <label class="etiqueta flex-1 text-xs">Conteo físico<input class="campo !mt-0 px-2 py-1.5" type="number" name="cantidad" min="0" max="100000" step="0.001" required></label>
+                    <label class="sr-only" for="motivo-ajuste-{{ a.id }}">Motivo del ajuste de {{ a.nombre }}</label>
+                    <input id="motivo-ajuste-{{ a.id }}" class="campo !mt-0 min-w-36 px-2 py-1.5 text-xs" name="motivo" minlength="5" maxlength="500" placeholder="Motivo" required>
+                    <button class="btn-secundario px-3 py-2" type="submit">Ajustar</button>
+                  </form>
+                {% else %}<span class="text-xs text-slate-400">Reactivar en Catálogo</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}<tr><td colspan="10" class="px-3 py-8 text-center text-slate-500">No hay artículos con control de stock. Actívalo en Catálogo para comenzar.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="inventario-articulos-movil">
+      {% for a in articulos %}
+        {% set bajo = a.stock_milesimas <= a.stock_minimo_milesimas %}
+        <article class="tarjeta" data-filtro-item data-filtro-grupo="{{ 'archivado' if not a.activo else 'bajo' if bajo else 'disponible' }}{{ ' sin_movimiento' if a.activo and not a.movimientos_total else '' }}" data-filtro-texto="{{ a.nombre }} {{ a.sku }} {{ a.unidad }}">
+          <div class="flex items-start justify-between gap-3"><div class="min-w-0"><h3 class="font-semibold">{{ a.nombre }}</h3><p class="mt-1 break-all font-mono text-xs text-slate-500">{{ a.sku or 'Sin SKU' }} · {{ a.unidad }}</p></div><span class="shrink-0 rounded-full px-2 py-1 text-xs {{ 'bg-amber-100 text-amber-800' if bajo and a.activo else 'bg-emerald-50 text-emerald-700' if a.activo else 'bg-slate-100 text-slate-500' }}">{{ 'Reponer' if bajo and a.activo else 'Disponible' if a.activo else 'Archivado' }}</span></div>
+          <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-200 pt-3 text-sm"><div><dt class="text-xs text-slate-500">Existencia</dt><dd class="font-semibold tabular-nums">{{ a.stock_milesimas|cantidad_stock }}</dd></div><div><dt class="text-xs text-slate-500">Mínimo</dt><dd class="tabular-nums">{{ a.stock_minimo_milesimas|cantidad_stock }}</dd></div><div><dt class="text-xs text-slate-500">Costo promedio</dt><dd class="tabular-nums">{{ a.costo_promedio_centavos|dinero }}</dd></div><div><dt class="text-xs text-slate-500">Valorización</dt><dd class="font-semibold tabular-nums">{{ a.valor_stock_centavos|dinero }}</dd></div><div class="col-span-2"><dt class="text-xs text-slate-500">Último movimiento</dt><dd>{{ a.ultimo_movimiento|momento if a.ultimo_movimiento else 'Sin movimientos' }}</dd></div></dl>
+          {% if a.activo %}
+            <form method="post" action="{{ url_for('inventario_ajustar', articulo_id=a.id) }}" class="mt-4 grid gap-3 border-t border-slate-200 pt-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label class="etiqueta">Conteo físico<input class="campo" type="number" name="cantidad" min="0" max="100000" step="0.001" required></label>
+              <label class="etiqueta">Motivo del ajuste<input class="campo" name="motivo" minlength="5" maxlength="500" placeholder="Por ejemplo: conteo semanal" required></label>
+              <button class="btn-secundario w-full" type="submit">Guardar conteo y ajustar</button>
+            </form>
+          {% endif %}
+        </article>
+      {% else %}
+        <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">ST</span><h2>Sin artículos controlados</h2><p>Activa el control de stock desde el catálogo para comenzar.</p></div>
+      {% endfor %}
+    </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay artículos que coincidan con el texto y el filtro.</p>
+  </section>
+
+  <section class="tarjeta" data-filtro-lista aria-label="Movimientos recientes de stock">
+    <div class="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 class="font-semibold">Historial de movimientos</h2><p class="mt-1 text-xs text-slate-500">{{ paginacion_movimientos.total }} movimientos. Los errores se corrigen con una reversión que conserva el asiento original.</p></div><a class="enlace text-sm" href="{{ url_for('respaldo_excel') }}">Descargar Excel</a></div>
+    <form method="get" class="mb-3 flex flex-wrap items-end gap-3" role="search"><label class="etiqueta min-w-0 flex-1" for="buscar-movimiento">Buscar en todo el historial<input id="buscar-movimiento" class="campo" type="search" name="q" value="{{ busqueda_movimientos }}" data-filtro-busqueda placeholder="Artículo, tipo, motivo o persona…"></label><button class="btn-secundario" type="submit">Buscar</button>{% if busqueda_movimientos %}<a class="btn-secundario" href="{{ url_for('inventario') }}">Limpiar</a>{% endif %}<span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></form>
+    <div class="inventario-movimientos-tabla overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-3 py-3">Fecha</th><th class="px-3 py-3">Artículo</th><th class="px-3 py-3">Tipo</th><th class="px-3 py-3 text-right">Cantidad</th><th class="px-3 py-3">Motivo</th><th class="px-3 py-3">Registró</th><th class="px-3 py-3"></th></tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for m in movimientos %}
+            <tr data-filtro-item data-filtro-grupo="{{ m.tipo }}" data-filtro-texto="{{ m.articulo }} {{ m.sku }} {{ m.tipo }} {{ m.motivo }} {{ m.usuario_nombre }}">
+              <td class="px-3 py-3 whitespace-nowrap">{{ m.creado_en|momento }}</td><td class="px-3 py-3">{{ m.sku + ' · ' if m.sku else '' }}{{ m.articulo }}</td>
+              <td class="px-3 py-3">{{ {'recepcion': 'Recepción', 'consumo': 'Consumo', 'ajuste': 'Ajuste', 'devolucion': 'Devolución', 'reversion': 'Reversión'}[m.tipo] }}</td>
+              <td class="px-3 py-3 text-right tabular-nums">{{ m.cantidad_milesimas|cantidad_stock }} {{ m.unidad }}</td><td class="px-3 py-3">{{ m.motivo or '—' }}</td><td class="px-3 py-3">{{ m.usuario_nombre or '—' }}</td>
+              <td class="px-3 py-3 text-right">
+                {% if not m.revertido and m.tipo != 'reversion' %}
+                  <form method="post" action="{{ url_for('inventario_revertir', movimiento_id=m.id) }}" class="flex min-w-52 items-center gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <label class="sr-only" for="motivo-reversion-{{ m.id }}">Motivo para revertir el movimiento {{ m.id }}</label>
+                    <input id="motivo-reversion-{{ m.id }}" class="campo !mt-0 px-2 py-1 text-xs" name="motivo" minlength="5" maxlength="500" placeholder="Motivo de reversión" required>
+                    <button class="text-xs font-semibold text-red-700 hover:underline" type="submit">Revertir</button>
+                  </form>
+                {% elif m.revertido %}<span class="text-xs text-slate-500">Revertido</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}<tr><td colspan="7" class="px-3 py-8 text-center text-slate-500">Todavía no hay movimientos de stock.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="inventario-movimientos-movil">
+      {% for m in movimientos %}
+        <article class="tarjeta" data-filtro-item data-filtro-grupo="{{ m.tipo }}" data-filtro-texto="{{ m.articulo }} {{ m.sku }} {{ m.tipo }} {{ m.motivo }} {{ m.usuario_nombre }}">
+          <div class="flex items-start justify-between gap-3"><div><p class="text-xs text-slate-500">{{ m.creado_en|momento }}</p><h3 class="mt-1 font-semibold">{{ m.articulo }}</h3><p class="mt-1 font-mono text-xs text-slate-500">{{ m.sku or 'Sin SKU' }}</p></div><span class="estado-orden">{{ {'recepcion': 'Recepción', 'consumo': 'Consumo', 'ajuste': 'Ajuste', 'devolucion': 'Devolución', 'reversion': 'Reversión'}[m.tipo] }}</span></div>
+          <p class="mt-3 text-lg font-semibold tabular-nums">{{ m.cantidad_milesimas|cantidad_stock }} {{ m.unidad }}</p><p class="mt-1 text-sm text-slate-600">{{ m.motivo or 'Sin motivo indicado' }}</p><p class="mt-2 text-xs text-slate-500">Registró · {{ m.usuario_nombre or '—' }}</p>
+          {% if not m.revertido and m.tipo != 'reversion' %}
+            <details class="mt-3 border-t border-slate-200 pt-3"><summary class="text-sm font-semibold text-red-700">Revertir este movimiento</summary><form method="post" action="{{ url_for('inventario_revertir', movimiento_id=m.id) }}" class="mt-3 grid gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="etiqueta">Motivo de reversión<input class="campo" name="motivo" minlength="5" maxlength="500" required></label><button class="btn-peligro" type="submit">Confirmar reversión</button></form></details>
+          {% elif m.revertido %}<p class="mt-3 border-t border-slate-200 pt-3 text-xs font-semibold text-slate-500">Movimiento revertido</p>{% endif %}
+        </article>
+      {% else %}
+        <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">MV</span><h2>Sin movimientos recientes</h2><p>Las recepciones, consumos, ajustes y reversiones se mostrarán aquí.</p></div>
+      {% endfor %}
+    </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay movimientos que coincidan en esta página del historial.</p>
+    {{ paginacion_lista(paginacion_movimientos) }}
+  </section>
+{% endblock %}

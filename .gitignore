@@ -5,6 +5,7 @@ taller.db-journal
 *.db-journal
 *.tmp
 respaldos/
+logs/
 simulacion_datos/
 .secret_key
 
@@ -12,3 +13,5 @@ simulacion_datos/
 venv/
 __pycache__/
 *.pyc
+node_modules/
+.playwright-mcp/

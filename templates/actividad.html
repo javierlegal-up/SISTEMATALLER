@@ -11,7 +11,8 @@
 {% block contenido %}
   <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-semibold">Actividad</h1>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Control del sistema</p>
+      <h1 class="mt-1">Actividad</h1>
       <p class="mt-1 text-sm text-neutral-500">
         Trabajo de {{ persona.nombre if persona else 'todo el equipo' }}
         del <strong>{{ desde.strftime('%d/%m/%Y') }}</strong> al <strong>{{ hasta.strftime('%d/%m/%Y') }}</strong>.
@@ -69,7 +70,7 @@
     <section class="mb-6">
       <h2 class="mb-3 text-lg font-semibold">Rendimiento por persona</h2>
       <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table class="w-full text-left text-sm">
+        <table data-mobile-cards class="w-full text-left text-sm">
           <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th class="px-4 py-3">Persona</th>
@@ -101,8 +102,10 @@
 
   <h2 class="mb-3 text-lg font-semibold">Detalle <span class="text-base font-normal text-slate-500">({{ paginacion.total }})</span></h2>
   {% if registros %}
+    <section data-filtro-lista aria-label="Detalle de actividad">
+    <div class="mb-3 flex flex-wrap items-center gap-3"><label class="sr-only" for="buscar-actividad">Buscar en la página de actividad</label><input id="buscar-actividad" class="campo !mt-0 min-w-56 flex-1" type="search" data-filtro-busqueda placeholder="Persona, acción, orden o detalle…"><span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></div>
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <table class="w-full text-left text-sm">
+      <table data-mobile-cards class="w-full text-left text-sm">
         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
             <th class="px-4 py-3">Fecha y hora</th>
@@ -114,7 +117,7 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for r in registros %}
-            <tr class="hover:bg-slate-50">
+              <tr class="hover:bg-slate-50" data-filtro-item data-filtro-texto="{{ r.momento }} {{ r.usuario_nombre }} {{ r.accion }} {{ r.detalle }} {{ r.orden_id }}">
               <td class="whitespace-nowrap px-4 py-3">{{ r.momento|momento }}</td>
               <td class="px-4 py-3">{{ r.momento|turno }}</td>
               <td class="px-4 py-3 font-medium">{{ r.usuario_nombre or '—' }}</td>
@@ -127,7 +130,9 @@
         </tbody>
       </table>
     </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay registros que coincidan en esta página de actividad.</p>
     {{ paginacion_lista(paginacion) }}
+    </section>
   {% else %}
     <p class="tarjeta text-sm text-slate-500">No hay actividad en este período.</p>
   {% endif %}

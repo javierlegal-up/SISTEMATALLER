@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
   <!-- El navegador usa este título como nombre sugerido al guardar en PDF. -->
   <title>{{ orden.id|num_ot }} - {{ orden.patente }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
   <style>
     @page { size: A4; margin: 15mm; }
     tr, .sin-corte { break-inside: avoid; }

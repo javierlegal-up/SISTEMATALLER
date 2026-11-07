@@ -40,14 +40,90 @@ if errorlevel 1 (
     exit /b 1
 )
 
+"venv\Scripts\python.exe" -c "import exportar_excel" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro exportar_excel.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_respaldos" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_respaldos.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_analitica" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_analitica.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import persistencia" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro persistencia.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_reportes" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_reportes.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_seguridad" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_seguridad.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_ordenes" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_ordenes.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" -c "import servicio_inventario" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: no se encontro servicio_inventario.py junto a app.py.
+    echo.
+    pause
+    exit /b 1
+)
+
+"venv\Scripts\python.exe" verificar_inicio.py
+if errorlevel 2 (
+    echo.
+    pause
+    exit /b 0
+)
+if errorlevel 1 (
+    echo.
+    pause
+    exit /b 1
+)
+
 echo.
 echo Taller San Cayetano en marcha: http://127.0.0.1:5000
 echo NO cierres esta ventana mientras uses el sistema.
 echo Para apagarlo, cierra esta ventana.
 echo.
 
-rem Espera unos segundos a que arranque el servidor y abre el navegador.
-start "" /min cmd /c "ping -n 4 127.0.0.1 >nul & start http://127.0.0.1:5000"
+rem Espera a /healthz y abre el navegador solo cuando Flask está listo.
+start "" /min "%~dp0venv\Scripts\pythonw.exe" "%~dp0abrir_navegador.py"
 
 "venv\Scripts\python.exe" app.py
 

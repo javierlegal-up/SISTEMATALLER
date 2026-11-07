@@ -1,6 +1,6 @@
 {% from "_macros.html" import estado_badge %}
 {% if ordenes %}
-  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+  <div class="ordenes-relacion-tabla overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
     <table class="w-full text-left text-sm">
       <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
         <tr>
@@ -25,6 +25,17 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+  <div class="ordenes-relacion-movil">
+    {% for o in ordenes %}
+      <article class="tarjeta">
+        <div class="flex items-start justify-between gap-3"><a class="orden-numero" href="{{ url_for('orden_detalle', orden_id=o.id) }}">{{ o.id|num_ot }}</a><span class="estado-orden estado-{{ o.estado|lower|replace(' ', '-') }}">{{ 'Anulada' if o.anulada else o.estado }}</span></div>
+        <p class="mt-3 text-sm font-semibold"><a class="enlace font-mono" href="{{ url_for('vehiculo_detalle', vehiculo_id=o.vehiculo_id) }}">{{ o.patente }}</a> · {{ o.marca }} {{ o.modelo }}</p>
+        <p class="mt-1 text-xs text-slate-500">Ingreso · {{ o.fecha_ingreso|fecha }}{% if o.fecha_prometida %} · Entrega · {{ o.fecha_prometida|fecha }}{% endif %}</p>
+        {% if es_dueno %}<p class="mt-3 border-t border-slate-200 pt-3 text-sm font-semibold">{{ 'Falta precio' if o.lineas_sin_precio else o.total|dinero }}</p>{% endif %}
+        <a class="btn-secundario mt-3 w-full" href="{{ url_for('orden_detalle', orden_id=o.id) }}">Abrir orden</a>
+      </article>
+    {% endfor %}
   </div>
 {% else %}
   <p class="tarjeta text-sm text-slate-500">No hay órdenes para mostrar.</p>

@@ -74,14 +74,14 @@
               <td class="whitespace-nowrap px-4 py-3">{{ l.fecha_trabajo|fecha }}</td>
               <td class="whitespace-nowrap px-4 py-3"><a class="enlace" href="{{ url_for('orden_detalle', orden_id=l.orden_id) }}">{{ l.orden_id|num_ot }}</a></td>
               <td class="px-4 py-3">{{ 'Mano de obra' if l.tipo == 'Servicio' else l.tipo }}</td>
-              <td class="px-4 py-3">{{ l.descripcion }}{% if l.del_cliente %} <span class="text-xs text-slate-500">(lo trajo el cliente)</span>{% endif %}</td>
+              <td class="px-4 py-3">{{ l.descripcion }}{% if l.del_cliente %} <span class="text-xs text-slate-500">(lo trajo el cliente)</span>{% endif %}{% if l.anulada %}<span class="mt-1 block text-xs font-medium text-slate-600">Orden anulada · no integra los totales</span>{% elif not l.vigente %}<span class="mt-1 block text-xs font-medium text-amber-700">Línea reemplazada · no integra el importe vigente</span>{% endif %}</td>
               <td class="px-4 py-3 text-right">{{ l.cantidad|cantidad }}</td>
               {% if es_dueno %}
                 <td class="whitespace-nowrap px-4 py-3 text-right">{{ 'Falta precio' if l.falta_precio else l.precio_unitario_centavos|dinero }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right font-medium">{{ '—' if l.falta_precio else l.subtotal_centavos|dinero }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right text-slate-500">{{ l.costo_total_centavos|dinero if l.costo_total_centavos is not none else '—' }}</td>
               {% endif %}
-              <td class="px-4 py-3">{{ estado_badge(l.estado) }}</td>
+              <td class="px-4 py-3">{% if l.anulada %}<span class="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">Anulada</span>{% else %}{{ estado_badge(l.estado) }}{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>

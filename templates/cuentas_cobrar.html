@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Cuentas por cobrar{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-red-600">Finanzas</p>
+      <h1 class="mt-1 text-3xl font-semibold">Cuentas por cobrar</h1>
+      <p class="mt-1 text-sm text-slate-500">Órdenes completadas con saldo calculable a partir de cobros registrados.</p>
+    </div>
+    <a class="btn-secundario" href="{{ url_for('caja') }}">Ver caja</a>
+  </header>
+
+  <section class="tarjeta mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Saldo pendiente</p><p class="mt-1 text-3xl font-semibold tabular-nums">{{ saldo_total|dinero }}</p></div>
+    <p class="text-sm text-slate-500">{{ paginacion.total }} órdenes con saldo</p>
+  </section>
+
+  {% if historicas_sin_conciliar %}
+    <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status">
+      <strong>{{ historicas_sin_conciliar }} órdenes completadas antes del registro de cobros</strong> todavía tienen un saldo desconocido. Revísalas y concílialas individualmente antes de incluirlas en las cuentas.
+      <a class="ml-1 font-semibold underline" href="{{ url_for('ordenes', estado='Completado') }}">Ver completadas</a>
+    </div>
+  {% endif %}
+
+  {% if ordenes %}
+    <section data-filtro-lista aria-label="Órdenes con saldo pendiente">
+    <form method="get" class="mb-3 flex flex-wrap items-end gap-3" role="search"><label class="etiqueta min-w-0 flex-1" for="buscar-cobranza">Buscar en todas las cuentas<input id="buscar-cobranza" class="campo" type="search" name="q" value="{{ busqueda }}" data-filtro-busqueda placeholder="Cliente, patente o número de orden…"></label><button class="btn-secundario" type="submit">Buscar</button>{% if busqueda %}<a class="btn-secundario" href="{{ url_for('cuentas_cobrar') }}">Limpiar</a>{% endif %}<span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></form>
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <table data-mobile-cards class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr><th class="px-4 py-3">Orden</th><th class="px-4 py-3">Cliente</th><th class="px-4 py-3">Vehículo</th><th class="px-4 py-3">Terminada</th><th class="px-4 py-3 text-right">Total</th><th class="px-4 py-3 text-right">Cobrado</th><th class="px-4 py-3 text-right">Saldo</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for o in ordenes %}
+            <tr data-filtro-item data-filtro-texto="{{ o.id|num_ot }} {{ o.cliente_nombre }} {{ o.patente }} {{ o.marca }} {{ o.modelo }} {{ o.fecha_completado }}">
+              <td class="px-4 py-3"><a class="enlace" href="{{ url_for('orden_detalle', orden_id=o.id) }}">{{ o.id|num_ot }}</a></td>
+              <td class="px-4 py-3">{{ o.cliente_nombre }}</td>
+              <td class="px-4 py-3">{{ o.patente }} <span class="block text-xs text-slate-500">{{ o.marca }} {{ o.modelo }}</span></td>
+              <td class="px-4 py-3">{{ o.fecha_completado|fecha }}</td>
+              <td class="px-4 py-3 text-right tabular-nums">{{ o.total|dinero }}</td>
+              <td class="px-4 py-3 text-right tabular-nums">{{ o.pagado_centavos|dinero }}</td>
+              <td class="px-4 py-3 text-right font-semibold tabular-nums">{{ o.saldo_centavos|dinero }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay cuentas por cobrar que coincidan con la búsqueda.</p>
+    {{ paginacion_lista(paginacion) }}
+    </section>
+  {% else %}
+    <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">$+</span><h2>Sin saldos pendientes conciliados</h2><p>Las órdenes con deuda aparecen aquí cuando se completa el trabajo y sus cobros están registrados.</p><a class="btn-secundario mt-4" href="{{ url_for('ordenes', estado='Completado') }}">Revisar órdenes completadas</a></div>
+  {% endif %}
+{% endblock %}

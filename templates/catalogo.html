@@ -2,14 +2,15 @@
 {% from "_macros.html" import lista_errores, paginacion_lista %}
 {% block titulo %}Lista de precios{% endblock %}
 {% block contenido %}
-  <h1 class="text-2xl font-semibold">Lista de precios</h1>
-  <p class="mb-5 mt-1 text-sm text-slate-500">
-    Lista general de repuestos y servicios, para completar las órdenes más rápido. No está asociada a ningún auto.
-    Para ver lo que se le hizo a cada uno, entra a <a class="enlace" href="{{ url_for('vehiculos') }}">Vehículos</a>.
-  </p>
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Abastecimiento</p><h1 class="mt-1">Catálogo de artículos y servicios</h1>
+      <p class="mt-1 max-w-3xl text-sm text-slate-500">Precios, unidades y códigos de barras. Los repuestos controlados se reciben desde Compras; sus existencias y correcciones quedan en Inventario.</p>
+    </div>
+    <div class="flex flex-wrap gap-2"><a class="btn-secundario" href="{{ url_for('proveedores') }}">Proveedores</a><a class="btn-secundario" href="{{ url_for('inventario') }}">Inventario</a><a class="btn-primario" href="#formulario-articulo">Nuevo artículo</a></div>
+  </header>
   {{ lista_errores(errores) }}
 
-  <form method="post" action="{{ url_for('catalogo', editar=editar_id) if editar_id else url_for('catalogo') }}" class="tarjeta mb-6 grid items-end gap-4 sm:grid-cols-6">
+  <form id="formulario-articulo" method="post" action="{{ url_for('catalogo', editar=editar_id, estado=estado) if editar_id else url_for('catalogo', estado=estado) }}" class="tarjeta mb-6 grid items-end gap-4 sm:grid-cols-4 xl:grid-cols-8">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label class="etiqueta">Tipo
       <select class="campo" name="tipo">
@@ -17,21 +18,61 @@
       </select>
     </label>
     <label class="etiqueta sm:col-span-2">Nombre *<input class="campo" name="nombre" value="{{ item.nombre }}" required></label>
+    <label class="etiqueta">SKU interno<input class="campo" name="sku" maxlength="40" value="{{ item.sku }}" placeholder="Opcional"></label>
+    <label class="etiqueta">Unidad<input class="campo" name="unidad" maxlength="20" value="{{ item.unidad }}" placeholder="unidad"></label>
     <label class="etiqueta">Precio *<input class="campo" type="number" name="precio" value="{{ item.precio }}" min="0" step="0.01" required></label>
     <label class="etiqueta" title="Lo que te cuesta a ti. No aparece en el comprobante.">Tu costo <span class="font-normal text-slate-400">(opcional)</span><input class="campo" type="number" name="costo" value="{{ item.costo }}" min="0" step="0.01"></label>
-    <div class="flex gap-2">
+    <label class="etiqueta">Mínimo de stock<input class="campo" type="number" name="stock_minimo" value="{{ item.stock_minimo }}" min="0" max="100000" step="0.001"></label>
+    <label class="flex items-center gap-2 pb-2 text-sm font-medium text-slate-700"><input type="checkbox" name="controla_stock" value="1" {{ 'checked' if item.controla_stock }}> Controlar stock</label>
+    <div class="flex gap-2 xl:col-span-2">
       <button class="btn-primario flex-1" type="submit">{{ 'Guardar' if editar_id else 'Agregar' }}</button>
       {% if editar_id %}<a class="btn-secundario" href="{{ url_for('catalogo') }}">Cancelar</a>{% endif %}
     </div>
   </form>
 
+  <div class="mb-4 flex flex-wrap gap-2">
+    <a class="btn-secundario" href="{{ url_for('inventario') }}">Ver inventario</a>
+    <a class="btn-secundario" href="{{ url_for('compras') }}">Compras</a>
+  </div>
+
+  <nav class="mb-4 flex flex-wrap gap-2" aria-label="Estado de artículos del catálogo">
+    <a class="filtro-chip {{ 'filtro-activo' if estado == 'activos' }}" href="{{ url_for('catalogo', estado='activos', q=busqueda or none) }}" {{ 'aria-current=page'|safe if estado == 'activos' else '' }}>Activos</a>
+    <a class="filtro-chip {{ 'filtro-activo' if estado == 'archivados' }}" href="{{ url_for('catalogo', estado='archivados', q=busqueda or none) }}" {{ 'aria-current=page'|safe if estado == 'archivados' else '' }}>Archivados · {{ cantidad_archivados }}</a>
+    <a class="filtro-chip {{ 'filtro-activo' if estado == 'todos' }}" href="{{ url_for('catalogo', estado='todos', q=busqueda or none) }}" {{ 'aria-current=page'|safe if estado == 'todos' else '' }}>Todos</a>
+  </nav>
+
+  <form method="get" class="tarjeta mb-5 grid items-end gap-3 sm:grid-cols-[minmax(14rem,1fr)_auto_auto]" role="search">
+    <input type="hidden" name="estado" value="{{ estado }}">
+    <label class="etiqueta">Buscar artículo o escanear código de barras
+      <input class="campo" type="search" name="q" value="{{ busqueda }}" placeholder="Nombre, SKU o código…" autocomplete="off" aria-describedby="ayuda-busqueda-catalogo">
+    </label>
+    <button class="btn-primario" type="submit">Buscar en todo el catálogo</button>
+    {% if busqueda %}<a class="btn-secundario" href="{{ url_for('catalogo') }}">Limpiar</a>{% endif %}
+    <p id="ayuda-busqueda-catalogo" class="text-xs text-slate-500 sm:col-span-3">Un lector tipo teclado escribe el código aquí; presiona Enter para buscar en todas las páginas. Los filtros por tipo se aplican a los resultados mostrados.</p>
+  </form>
+
   {% if catalogo %}
+    <section data-filtro-lista aria-label="Elementos del catálogo">
+    <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div><h2 class="font-semibold">Artículos y servicios activos</h2><p class="mt-1 text-xs text-slate-500">{{ paginacion.total }} resultados{% if busqueda %} para «{{ busqueda }}»{% endif %}; el SKU exacto aparece primero.</p></div>
+      <span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span>
+    </div>
+    <div class="mb-3">
+      <div class="filtros-orden" aria-label="Filtrar elementos del catálogo">
+        <button type="button" class="filtro-chip filtro-activo" data-filtro-valor="*" aria-pressed="true">Todos</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="Repuesto" aria-pressed="false">Repuestos</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="Servicio" aria-pressed="false">Mano de obra</button>
+        <button type="button" class="filtro-chip" data-filtro-valor="stock" aria-pressed="false">Con control de stock</button>
+      </div>
+    </div>
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <table class="w-full text-left text-sm">
+    <table data-mobile-cards class="w-full text-left text-sm">
         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
             <th class="px-4 py-3">Tipo</th>
             <th class="px-4 py-3">Nombre</th>
+            <th class="px-4 py-3">SKU / unidad</th>
+            <th class="px-4 py-3 text-right">Existencia</th>
             <th class="px-4 py-3 text-right">Precio</th>
             <th class="px-4 py-3 text-right">Tu costo</th>
             <th class="px-4 py-3 text-right">Acciones</th>
@@ -39,18 +80,27 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for c in catalogo %}
-            <tr>
+            <tr data-filtro-item data-filtro-grupo="{{ c.tipo }}{{ ' stock' if c.controla_stock }}" data-filtro-texto="{{ c.nombre }} {{ c.sku }} {{ c.unidad }} {{ c.tipo }}">
               <td class="px-4 py-3">{{ 'Mano de obra' if c.tipo == 'Servicio' else c.tipo }}</td>
               <td class="px-4 py-3">{{ c.nombre }}</td>
+              <td class="px-4 py-3 text-slate-500">{{ c.sku or '—' }}{% if c.controla_stock %} · {{ c.unidad }}{% endif %}</td>
+              <td class="px-4 py-3 text-right">{{ c.stock_milesimas|cantidad_stock if c.controla_stock else '—' }}</td>
               <td class="px-4 py-3 text-right">{{ c.precio_centavos|dinero }}</td>
               <td class="px-4 py-3 text-right text-slate-500">{{ c.costo_centavos|dinero if c.costo_centavos is not none else '—' }}</td>
               <td class="px-4 py-3">
                 <div class="flex items-center justify-end gap-3">
-                  <a class="enlace" href="{{ url_for('catalogo', editar=c.id) }}">Editar</a>
-                  <form method="post" action="{{ url_for('catalogo_eliminar', item_id=c.id) }}" onsubmit="return confirm('¿Eliminar este elemento del catálogo?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="text-red-700 hover:underline" type="submit">Eliminar</button>
-                  </form>
+                  <a class="enlace" href="{{ url_for('catalogo', editar=c.id, estado=estado) }}">Editar</a>
+                  {% if c.activo %}
+                    <form method="post" action="{{ url_for('catalogo_eliminar', item_id=c.id) }}" onsubmit="return confirm('¿Archivar este elemento? Se conservarán las compras y movimientos existentes.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="estado" value="{{ estado }}">
+                      <button class="text-red-700 hover:underline" type="submit">Archivar</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('catalogo_reactivar', item_id=c.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button class="enlace" type="submit">Reactivar</button>
+                    </form>
+                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -58,8 +108,11 @@
         </tbody>
       </table>
     </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay artículos que coincidan en esta página.</p>
     {{ paginacion_lista(paginacion) }}
+    </section>
   {% else %}
-    <p class="tarjeta text-sm text-slate-500">El catálogo está vacío. Agrega aquí los repuestos y servicios que usas con frecuencia.</p>
+    <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">SKU</span><h2>{% if busqueda %}No encontramos ese artículo{% elif estado == 'archivados' %}No hay artículos archivados{% else %}El catálogo está vacío{% endif %}</h2><p>{% if busqueda %}Revisa el nombre o código, o limpia la búsqueda para ver los artículos de este estado.{% elif estado == 'archivados' %}Los artículos que archives aparecerán aquí y podrás reactivarlos sin perder su historial.{% else %}Agrega los repuestos y servicios frecuentes. Puedes cargar el SKU que luego usarás con el lector de código de barras.{% endif %}</p><div class="mt-4 flex flex-wrap gap-2">{% if busqueda %}<a class="btn-secundario" href="{{ url_for('catalogo', estado=estado) }}">Limpiar búsqueda</a>{% endif %}<a class="btn-primario" href="#formulario-articulo">Agregar artículo o servicio</a></div></div>
   {% endif %}
+  {% if catalogo %}{{ paginacion_lista(paginacion) }}{% endif %}
 {% endblock %}

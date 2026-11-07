@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wider text-red-600">ANALÍTICA DEL NEGOCIO</p>
+      <h1 class="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{{ titulo }}</h1>
+      <p class="mt-2 text-sm text-slate-600">Registros del {{ desde|fecha }} al {{ hasta|fecha }}. Cada fila abre su orden, compra o gasto de origen.</p>
+    </div>
+    <a class="btn-secundario" href="{{ url_for('analitica', periodo='personalizado', desde=desde, hasta=hasta) }}">← Volver a analítica</a>
+  </header>
+
+  <form method="get" class="tarjeta mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(130px,1fr)_minmax(130px,1fr)_auto] lg:items-end" aria-label="Filtrar detalle por período">
+    <input type="hidden" name="tipo" value="{{ tipo }}">
+    <input type="hidden" name="periodo" value="personalizado">
+    {% if filtros.medio %}<input type="hidden" name="medio" value="{{ filtros.medio }}">{% endif %}
+    {% if filtros.categoria %}<input type="hidden" name="categoria" value="{{ filtros.categoria }}">{% endif %}
+    {% if filtros.descripcion %}<input type="hidden" name="descripcion" value="{{ filtros.descripcion }}">{% endif %}
+    {% if filtros.item_tipo %}<input type="hidden" name="item_tipo" value="{{ filtros.item_tipo }}">{% endif %}
+    <label class="etiqueta">Desde<input class="campo" type="date" name="desde" value="{{ desde }}" max="{{ hasta }}" required></label>
+    <label class="etiqueta">Hasta<input class="campo" type="date" name="hasta" value="{{ hasta }}" max="{{ hoy_iso }}" required></label>
+    <button class="btn-primario" type="submit">Aplicar período</button>
+  </form>
+
+  <section class="mb-5 grid gap-3 sm:grid-cols-2" aria-label="Resumen del detalle">
+    <article class="tarjeta">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Registros fuente</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ cantidad }}</p>
+      <p class="mt-1 text-xs text-slate-500">Página {{ paginacion.pagina }} de {{ paginacion.paginas }}</p>
+    </article>
+    {% if mostrar_total %}
+      <article class="tarjeta">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ total_label }}</p>
+        <p id="total-detalle" class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ total_centavos|dinero }}</p>
+        <p class="mt-1 text-xs text-slate-500">Reconciliado con el indicador del período.</p>
+      </article>
+    {% endif %}
+  </section>
+
+  <section class="tarjeta">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-base font-bold">Movimientos de origen</h2>
+      <span class="text-xs text-slate-500">{{ paginacion.total }} registros</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table data-mobile-cards class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr><th class="px-3 py-3">Fecha</th><th class="px-3 py-3">Origen</th><th class="px-3 py-3">Cliente / proveedor</th><th class="px-3 py-3">Detalle / referencia</th>{% if mostrar_total %}<th class="px-3 py-3 text-right">Importe</th>{% endif %}</tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for fila in filas %}
+            <tr>
+              <td class="px-3 py-3 whitespace-nowrap">{{ fila.fecha|fecha }}</td>
+              <td class="px-3 py-3">
+                {% if fila.url %}<a class="enlace font-semibold" href="{{ fila.url }}">{{ fila.documento }}</a>{% else %}<span class="font-semibold">{{ fila.documento }}</span>{% endif %}
+                <span class="block text-xs text-slate-500">{{ fila.movimiento }}</span>
+              </td>
+              <td class="px-3 py-3">{{ fila.cliente or '—' }}{% if fila.patente %}<span class="block text-xs text-slate-500">{{ fila.patente }}</span>{% endif %}</td>
+              <td class="px-3 py-3">{{ fila.concepto or '—' }}{% if fila.referencia %}<span class="block text-xs text-slate-500">{{ fila.referencia }}</span>{% endif %}</td>
+              {% if mostrar_total %}<td class="px-3 py-3 text-right font-semibold tabular-nums">{{ fila.importe_centavos|dinero }}</td>{% endif %}
+            </tr>
+          {% else %}
+            <tr><td colspan="{% if mostrar_total %}5{% else %}4{% endif %}" class="px-3 py-10 text-center text-slate-500">No hay movimientos fuente para este período y filtro.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ paginacion_lista(paginacion) }}
+  </section>
+{% endblock %}

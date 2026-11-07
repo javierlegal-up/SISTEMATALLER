@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "_macros.html" import lista_errores %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Proveedores{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Compras e inventario</p>
+      <h1 class="text-2xl font-semibold">Proveedores</h1>
+      <p class="mt-1 text-sm text-slate-500">Contactos y documentos de compra asociados.</p>
+    </div>
+    <a class="btn-secundario" href="{{ url_for('compras') }}">Ir a compras</a>
+  </header>
+  {{ lista_errores(errores) }}
+  <form method="post" action="{{ url_for('proveedores', editar=editar_id) if editar_id else url_for('proveedores') }}" class="tarjeta mb-6 grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="etiqueta xl:col-span-2">Razón social / nombre *<input class="campo" name="nombre" maxlength="120" value="{{ item.nombre }}" required></label>
+    <label class="etiqueta">CUIT / documento<input class="campo" name="documento" maxlength="32" value="{{ item.documento }}"></label>
+    <label class="etiqueta">Teléfono<input class="campo" name="telefono" maxlength="40" value="{{ item.telefono }}"></label>
+    <label class="etiqueta">Email<input class="campo" type="email" name="email" maxlength="160" value="{{ item.email }}"></label>
+    <label class="etiqueta">Dirección<input class="campo" name="direccion" maxlength="240" value="{{ item.direccion }}"></label>
+    <div class="flex gap-2 xl:col-span-2">
+      <button class="btn-primario flex-1" type="submit">{{ 'Guardar cambios' if editar_id else 'Agregar proveedor' }}</button>
+      {% if editar_id %}<a class="btn-secundario" href="{{ url_for('proveedores') }}">Cancelar</a>{% endif %}
+    </div>
+  </form>
+  <section class="lista-operativa" data-filtro-lista aria-labelledby="titulo-lista-proveedores">
+    <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div><h2 id="titulo-lista-proveedores" class="font-semibold">Directorio de proveedores</h2><p class="mt-1 text-xs text-slate-500">Filtra por nombre, CUIT o contacto. El historial de compras permanece asociado al proveedor.</p></div>
+      <span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span>
+    </div>
+    <form method="get" class="mb-3 grid items-end gap-3 sm:grid-cols-[minmax(14rem,1fr)_minmax(10rem,auto)_auto]" role="search">
+      <label class="etiqueta" for="buscar-proveedor">Buscar en todo el directorio
+        <input id="buscar-proveedor" class="campo" type="search" name="q" value="{{ busqueda }}" data-filtro-busqueda placeholder="Nombre, CUIT, teléfono o email…">
+      </label>
+      <label class="etiqueta">Estado<select class="campo" name="estado"><option value="todos" {{ 'selected' if estado == 'todos' }}>Todos</option><option value="activos" {{ 'selected' if estado == 'activos' }}>Activos</option><option value="archivados" {{ 'selected' if estado == 'archivados' }}>Archivados</option></select></label>
+      <button class="btn-secundario" type="submit">Aplicar filtros</button>
+      {% if busqueda or estado != 'todos' %}<a class="btn-secundario" href="{{ url_for('proveedores') }}">Limpiar</a>{% endif %}
+    </form>
+  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <table data-mobile-cards class="w-full text-left text-sm">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500"><tr>
+        <th class="px-4 py-3">Proveedor</th><th class="px-4 py-3">Documento</th><th class="px-4 py-3">Contacto</th><th class="px-4 py-3 text-right">Compras</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Acciones</th>
+      </tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for p in proveedores %}<tr data-filtro-item data-filtro-grupo="{{ 'activo' if p.activo else 'archivado' }}" data-filtro-texto="{{ p.nombre }} {{ p.documento }} {{ p.telefono }} {{ p.email }} {{ p.direccion }}">
+          <td class="px-4 py-3 font-medium"><a class="enlace" href="{{ url_for('proveedor_detalle', proveedor_id=p.id) }}">{{ p.nombre }}</a></td>
+          <td class="px-4 py-3">{{ p.documento or '—' }}</td>
+          <td class="px-4 py-3 text-slate-500">{{ p.telefono or p.email or '—' }}</td>
+          <td class="px-4 py-3 text-right tabular-nums">{{ p.compras_total }}</td>
+          <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs {{ 'bg-emerald-50 text-emerald-700' if p.activo else 'bg-slate-100 text-slate-500' }}">{{ 'Activo' if p.activo else 'Archivado' }}</span></td>
+          <td class="px-4 py-3"><div class="flex justify-end gap-3">
+            <a class="enlace" href="{{ url_for('proveedores', editar=p.id, estado=estado) }}">Editar</a>
+            <form method="post" action="{{ url_for('proveedor_cambiar_estado', proveedor_id=p.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="text-red-700 hover:underline" type="submit">{{ 'Archivar' if p.activo else 'Reactivar' }}</button>
+            </form>
+          </div></td>
+        </tr>{% else %}<tr><td class="px-4 py-8 text-center text-slate-500" colspan="6">Todavía no hay proveedores.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay proveedores que coincidan con la búsqueda y el filtro.</p>
+  {{ paginacion_lista(paginacion) }}
+  </section>
+{% endblock %}

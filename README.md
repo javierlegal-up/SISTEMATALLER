@@ -2,6 +2,8 @@
 
 Aplicación web local para gestionar clientes, vehículos, órdenes de trabajo y comprobantes imprimibles. Usa Python (Flask), SQLite y Tailwind CSS.
 
+Estado, prioridades y alcance restante: [PLAN_MEJORAS.md](PLAN_MEJORAS.md).
+
 ## Inicio rápido
 
 Haz doble clic en `iniciar.bat`. La primera vez instala lo necesario (requiere Python e Internet); después solo inicia el sistema y abre el navegador. Para apagarlo, cierra la ventana negra.
@@ -17,7 +19,7 @@ La primera vez que abres el sistema te pide crear la cuenta del **dueño**. Con 
 | Pasar órdenes de Pendiente a En proceso | ✅ | ✅ |
 | Poner precios y completar órdenes | ✅ | ❌ |
 | Ver el panel, importes, costos y ganancias | ✅ | ❌ |
-| Imprimir comprobantes, borrar, lista de precios | ✅ | ❌ |
+| Imprimir comprobantes, anular órdenes, lista de precios | ✅ | ❌ |
 | Usuarios, Actividad y copias de seguridad | ✅ | ❌ |
 
 - **Líneas sin precio:** lo que anota un empleado queda marcado como **Falta poner precio**. El dueño lo ve en esa sección del menú y no puede completar la orden hasta ponerle precio a todo.
@@ -81,6 +83,25 @@ La base de datos `taller.db` se crea sola la primera vez.
    Si cargas *Tu costo* en los repuestos (es opcional), también ves la ganancia estimada. Ese costo es interno y nunca aparece en el comprobante.
 6. **Comprobante:** en la orden, pulsa **Imprimir / PDF** y luego **Imprimir / Guardar PDF**. Para obtener un PDF, elige *Guardar como PDF* (o *Microsoft Print to PDF*) como impresora.
 
+## ERP propio del taller
+
+El sistema administra el taller en módulos propios y en una base SQLite local. **No se conecta ni sincroniza con Tango Gestión.**
+
+Incluye clientes, vehículos, órdenes de trabajo, catálogo, usuarios por rol, historial de actividad, anulaciones trazables, cobros parciales, caja, cuentas por cobrar, proveedores, compras con recepción parcial, inventario por movimientos, consumo explícito de repuestos en órdenes, pagos a proveedores, gastos, cierres de caja, copias/restauración, analítica del negocio y reportes trimestrales. Los informes distinguen trabajo terminado, dinero cobrado, costos consumidos, gastos, resultado estimado y flujo de caja. El Excel exporta las tablas operativas y financieras sin credenciales.
+
+El dueño tiene **Panel → Analítica del negocio** con rangos de 7, 30, 90 días, 12 meses o fechas personalizadas. Incluye gráficos de producción/caja, órdenes, margen/resultado, cobros y gastos; compara con el período anterior y muestra deuda, ticket promedio, inventario, reposición y trabajos más vendidos. El **Panel** del empleado muestra órdenes y cantidades sin importes ni reportes financieros. Los gráficos usan registros reales de la base y muestran un estado vacío cuando no hay movimientos.
+
+### Flujo de inventario y dinero
+
+1. Carga proveedores y artículos de tipo **Repuesto** con control de stock; define unidad, SKU, costo y mínimo.
+2. Crea una compra en borrador y registra cada recepción total o parcial. La recepción incrementa inventario y reconoce saldo pendiente con el proveedor.
+3. Enlaza el artículo del catálogo a una línea de una orden. El stock se descuenta cuando el dueño registra explícitamente el consumo; no al crear la orden.
+4. Ajustes y reversiones registran actor y motivo. No se permiten saldos negativos; los cambios a la identidad/unidad de artículos con historial requieren archivar y crear otro artículo.
+5. Registra pagos parciales desde la compra. Los gastos generales se cargan por separado. Caja reúne cobros, gastos y pagos por fecha y medio.
+6. Cierra cada día de caja con efectivo esperado, contado y diferencia. Un cierre se reabre con motivo y queda en el historial.
+
+La guía de mejoras documenta módulos implementados, reglas, aceptación verificada y etapas pendientes: [PLAN_MEJORAS.md](PLAN_MEJORAS.md).
+
 ## Comprobar que todo funciona
 
 ```powershell
@@ -88,6 +109,7 @@ python -m unittest -v
 ```
 
 Las pruebas usan una base de datos temporal y no tocan tus datos.
+El flujo de GitHub Actions `.github/workflows/verificar.yml` repite compilación, estilos y suite en Windows para cada push o pull request.
 
 ## Copias de seguridad
 
@@ -97,35 +119,47 @@ Todos los datos están en `taller.db`. El sistema hace copias solo:
 - **En el pendrive:** crea una carpeta llamada `RespaldoTaller` en la raíz del pendrive, es decir, al abrirlo, no dentro de otra carpeta. Mientras el pendrive esté conectado, el sistema le copia los respaldos solo. La letra de la unidad da igual.
 - **En la nube (opcional):** agrega una carpeta de Google Drive u OneDrive en `CARPETAS_EXTRA`, al inicio de `app.py`.
 
+Los fallos técnicos de respaldos, restauración, Excel y algunos movimientos financieros se guardan en `logs/taller.log`. El archivo rota al llegar a 1 MB y conserva hasta cinco versiones. En la pantalla se muestran mensajes simples; el detalle técnico queda en ese registro local.
+
 El panel muestra la fecha de la última copia en la compu y fuera de ella. Tiene un botón **Hacer copia ahora**, y avisa si pasan más de 3 días sin una copia fuera de la compu.
 
 **Hábito recomendado:** al terminar el día, conecta el pendrive, pulsa **Hacer copia ahora**, cierra el sistema y guarda el pendrive lejos de la compu.
 
 ### Restaurar una copia
 
-1. Cierra el sistema.
-2. Renombra `taller.db` a `taller_danado.db`. No lo borres todavía.
-3. Copia el archivo de la fecha que quieras, por ejemplo `respaldos\taller_2026-11-02.db`, a la carpeta del sistema.
-4. Renombra esa copia a `taller.db` y vuelve a abrir el sistema.
+Desde **Panel → Restaurar una copia**, selecciona un archivo `.db`, `.sqlite` o `.sqlite3`. El sistema valida integridad y relaciones, aplica migraciones en un temporal y guarda una copia de seguridad de la base actual antes de reemplazarla. Los archivos Excel son exportaciones y no se pueden restaurar.
 
-Lo registrado después de la fecha de la copia no estará en la base restaurada.
+Revisa la fecha del respaldo antes de confirmar: lo registrado después de esa fecha no estará en la base restaurada.
 
 ## Limitaciones
 
-- **Solo en esta computadora:** tiene usuarios y contraseñas, pero está pensado para una sola compu. Solo acepta conexiones desde ella misma; no lo publiques en Internet ni lo abras a la red.
-- **Requiere Internet para los estilos:** Tailwind se carga desde su CDN. Sin conexión, el sistema funciona y guarda datos, pero se ve sin diseño, incluso el comprobante.
-- **Sin control de stock:** el catálogo guarda nombres y precios, no existencias.
-- **Comprobante no fiscal:** es un recibo interno. No reemplaza una factura legal.
+- **Una computadora:** el servidor usa `127.0.0.1` y SQLite local. El inicio, las pantallas y los comprobantes funcionan sin Internet una vez instaladas las dependencias. La primera instalación de Flask puede requerir conexión.
+- **Sin acceso multi-PC:** usuarios y roles son para operar desde la computadora anfitriona; el sistema no está habilitado para trabajar en red desde varios puestos.
+- **Resultado estimado:** los reportes descuentan costos y gastos registrados; datos faltantes de costos o gastos pueden hacer que el resultado difiera de la utilidad real.
+- **Comprobante no fiscal:** es un documento interno del taller y no emite facturas fiscales.
 
 ## Estructura
 
 ```text
-app.py             Rutas, validaciones y esquema de la base de datos
+app.py             Rutas, coordinación de servicios y adaptadores compatibles
+servicio_respaldos.py Copias locales/externas, Excel y validación de bases
+servicio_analitica.py Períodos, series y consultas de analítica del negocio
+servicio_reportes.py Reporte trimestral y agregados para pantalla/impresión
+servicio_seguridad.py Roles, validación de cuentas y bloqueo de intentos
+servicio_ordenes.py Reglas de precios, estados y costos de órdenes
+servicio_inventario.py Stock, recepciones de compra, costos y saldos
+persistencia.py    Esquema SQLite, migraciones y respaldo previo
+exportar_excel.py  Exporta tablas operativas, de inventario y finanzas a Excel
 requirements.txt   Dependencias de Python
-test_app.py        Pruebas automáticas
+test_app.py        Pruebas funcionales de la aplicación
+test_servicio_seguridad.py Pruebas unitarias del servicio de seguridad
+test_servicio_ordenes.py Pruebas unitarias de reglas de órdenes
+test_servicio_inventario.py Pruebas unitarias de stock y compras
 templates/         Pantallas HTML
-iniciar.bat        Instala lo necesario e inicia el sistema con doble clic
+static/            Recursos locales, incluidos estilos y gráficos
+iniciar.bat        Instala lo necesario, comprueba el inicio y abre el navegador
 taller.db          Base de datos (se crea al iniciar)
 respaldos/         Copias de seguridad diarias (se crea al iniciar)
+logs/              Registro técnico local con rotación (se crea al iniciar)
 .secret_key        Clave de sesión (se crea al iniciar; no la compartas)
 ```

@@ -2,11 +2,12 @@
 {% from "_macros.html" import lista_errores %}
 {% block titulo %}Usuarios{% endblock %}
 {% block contenido %}
-  <h1 class="text-2xl font-semibold">Usuarios</h1>
-  <p class="mb-5 mt-1 text-sm text-neutral-500">
-    Crea un usuario para cada persona: así queda registrado quién hizo cada cosa.
-    Los empleados registran autos y trabajos, pero no ven precios ni números, no borran nada y no completan órdenes.
-  </p>
+  {% set estado_usuarios = namespace(activos=0, inactivos=0) %}{% for u in usuarios %}{% if u.activo %}{% set estado_usuarios.activos = estado_usuarios.activos + 1 %}{% else %}{% set estado_usuarios.inactivos = estado_usuarios.inactivos + 1 %}{% endif %}{% endfor %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Control del sistema</p><h1 class="mt-1">Usuarios</h1><p class="mt-1 max-w-3xl text-sm text-slate-500">Una cuenta por persona para identificar quién registró cada orden, cobro, movimiento o cambio administrativo.</p></div>
+    <a class="btn-secundario" href="{{ url_for('actividad') }}">Ver actividad del equipo</a>
+  </header>
+  <div class="mb-5 grid gap-3 sm:grid-cols-2"><section class="kpi-operativo"><p>Usuarios activos</p><strong>{{ estado_usuarios.activos }}</strong><span>Con acceso al sistema</span></section><section class="kpi-operativo"><p>Desactivados</p><strong>{{ estado_usuarios.inactivos }}</strong><span>Historial conservado</span></section></div>
 
   {{ lista_errores(errores) }}
   <form method="post" class="tarjeta mb-6 grid items-end gap-4 border-t-4 border-t-red-600 sm:grid-cols-6">
@@ -18,18 +19,21 @@
         {% for clave, nombre in NOMBRES_ROL.items() %}<option value="{{ clave }}" {{ 'selected' if datos.rol == clave }}>{{ nombre }}</option>{% endfor %}
       </select>
     </label>
-    <label class="etiqueta">Contraseña<input class="campo" type="password" name="clave" autocomplete="new-password" required></label>
-    <label class="etiqueta">Repetir<input class="campo" type="password" name="clave2" autocomplete="new-password" required></label>
+    <label class="etiqueta">Contraseña (mínimo {{ LARGO_MINIMO_CLAVE }} caracteres)<input class="campo" type="password" name="clave" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" required></label>
+    <label class="etiqueta">Repetir<input class="campo" type="password" name="clave2" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" required></label>
     <div class="sm:col-span-6"><button class="btn-primario" type="submit">Crear usuario</button></div>
   </form>
 
+  <section data-filtro-lista aria-label="Cuentas de usuario">
+  <div class="mb-3 flex flex-wrap items-center gap-3"><label class="sr-only" for="buscar-usuario">Buscar usuario</label><input id="buscar-usuario" class="campo !mt-0 min-w-56 flex-1" type="search" data-filtro-busqueda placeholder="Nombre, usuario o rol…"><div class="filtros-orden" aria-label="Filtrar cuentas"><button class="filtro-chip filtro-activo" type="button" data-filtro-valor="*" aria-pressed="true">Todas</button><button class="filtro-chip" type="button" data-filtro-valor="activo" aria-pressed="false">Activas</button><button class="filtro-chip" type="button" data-filtro-valor="inactivo" aria-pressed="false">Desactivadas</button></div><span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></div>
   <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-    <table class="w-full text-left text-sm">
+    <table data-mobile-cards class="w-full text-left text-sm">
       <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
         <tr>
           <th class="px-4 py-3">Nombre</th>
           <th class="px-4 py-3">Usuario</th>
           <th class="px-4 py-3">Rol</th>
+          <th class="px-4 py-3">Último acceso</th>
           <th class="px-4 py-3">Última actividad</th>
           <th class="px-4 py-3">Nueva contraseña</th>
           <th class="px-4 py-3 text-right">Estado</th>
@@ -37,16 +41,17 @@
       </thead>
       <tbody class="divide-y divide-slate-100">
         {% for u in usuarios %}
-          <tr class="{{ 'text-slate-400' if not u.activo }}">
+          <tr class="{{ 'text-slate-400' if not u.activo }}" data-filtro-item data-filtro-grupo="{{ 'activo' if u.activo else 'inactivo' }}" data-filtro-texto="{{ u.nombre }} {{ u.usuario }} {{ NOMBRES_ROL[u.rol] }}">
             <td class="px-4 py-3 font-medium">{{ u.nombre }}{% if u.id == usuario.id %} <span class="text-xs text-slate-500">(tú)</span>{% endif %}</td>
             <td class="px-4 py-3">{{ u.usuario }}</td>
             <td class="px-4 py-3">{{ NOMBRES_ROL[u.rol] }}</td>
+            <td class="whitespace-nowrap px-4 py-3">{{ u.ultimo_acceso|momento or 'Nunca ingresó' }}</td>
             <td class="whitespace-nowrap px-4 py-3">{{ u.ultima_actividad|momento or '—' }}</td>
             <td class="px-4 py-3">
               <form method="post" action="{{ url_for('usuario_cambiar_clave', usuario_id=u.id) }}" class="flex gap-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input class="campo !mt-0 w-28" type="password" name="clave" placeholder="Nueva" autocomplete="new-password" aria-label="Nueva contraseña de {{ u.nombre }}" required>
-                <input class="campo !mt-0 w-28" type="password" name="clave2" placeholder="Repetir" autocomplete="new-password" aria-label="Repetir contraseña de {{ u.nombre }}" required>
+                <input class="campo !mt-0 w-28" type="password" name="clave" placeholder="Mín. {{ LARGO_MINIMO_CLAVE }}" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" aria-label="Nueva contraseña de {{ u.nombre }}" required>
+                <input class="campo !mt-0 w-28" type="password" name="clave2" placeholder="Repetir" autocomplete="new-password" minlength="{{ LARGO_MINIMO_CLAVE }}" aria-label="Repetir contraseña de {{ u.nombre }}" required>
                 <button class="btn-secundario" type="submit">Cambiar</button>
               </form>
             </td>
@@ -65,5 +70,7 @@
       </tbody>
     </table>
   </div>
-  <p class="mt-3 text-xs text-neutral-500">Los usuarios no se borran: se desactivan, para conservar el registro de lo que hicieron. Un usuario desactivado ya no puede ingresar.</p>
+  <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay cuentas que coincidan con la búsqueda y el filtro.</p>
+  </section>
+  <p class="mt-3 text-xs text-neutral-500">Las claves nuevas tienen un mínimo de {{ LARGO_MINIMO_CLAVE }} caracteres. Al asignar una clave temporal, la persona deberá reemplazarla al ingresar. Los usuarios no se borran: se desactivan y se conserva su actividad; al reactivarlos, las sesiones anteriores quedan invalidadas.</p>
 {% endblock %}

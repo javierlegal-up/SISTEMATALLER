@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Caja{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-red-600">Finanzas</p>
+      <h1 class="mt-1 text-3xl font-semibold">Caja</h1>
+      <p class="mt-1 text-sm text-slate-500">Cobros, gastos, pagos a proveedores y reversiones, por fecha del movimiento.</p>
+    </div>
+    <div class="flex gap-2"><a class="btn-secundario" href="{{ url_for('cuentas_cobrar') }}">Cuentas por cobrar</a><a class="btn-secundario" href="{{ url_for('gastos') }}">Registrar gasto</a></div>
+  </header>
+
+  <form method="get" class="tarjeta mb-5 grid items-end gap-3 sm:grid-cols-3">
+    <label class="etiqueta">Desde<input class="campo" type="date" name="desde" value="{{ desde }}"></label>
+    <label class="etiqueta">Hasta<input class="campo" type="date" name="hasta" value="{{ hasta }}"></label>
+    <button class="btn-primario" type="submit">Ver período</button>
+  </form>
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <p class="text-xs text-slate-500">El CSV incluye todos los movimientos del rango, incluso los que aparecen en otras páginas.</p>
+    <a class="btn-secundario" href="{{ url_for('caja_exportar_csv', desde=desde, hasta=hasta) }}">Descargar movimientos CSV</a>
+  </div>
+
+  <div class="mb-5 grid gap-4 sm:grid-cols-2">
+    <section class="tarjeta">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Neto del período</p>
+      <p class="mt-2 text-3xl font-semibold tabular-nums">{{ total_neto|dinero }}</p>
+    </section>
+    {% for t in totales %}
+      <section class="tarjeta">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t.medio }}</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums">{{ t.total|dinero }}</p>
+        <p class="mt-1 text-xs text-slate-500">{{ t.movimientos }} movimientos</p>
+      </section>
+    {% endfor %}
+  </div>
+
+  {% if movimientos %}
+    <section data-filtro-lista aria-label="Movimientos de caja del período">
+    <form method="get" class="mb-3 flex flex-wrap items-end gap-3" role="search"><input type="hidden" name="desde" value="{{ desde }}"><input type="hidden" name="hasta" value="{{ hasta }}"><label class="etiqueta min-w-0 flex-1" for="buscar-caja">Buscar en todos los movimientos del período<input id="buscar-caja" class="campo" type="search" name="q" value="{{ busqueda }}" data-filtro-busqueda placeholder="Concepto, origen, medio o persona…"></label><button class="btn-secundario" type="submit">Buscar</button>{% if busqueda %}<a class="btn-secundario" href="{{ url_for('caja', desde=desde, hasta=hasta) }}">Limpiar</a>{% endif %}<span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></form>
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <table data-mobile-cards class="w-full text-left text-sm">
+        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <tr><th class="px-4 py-3">Fecha</th><th class="px-4 py-3">Origen</th><th class="px-4 py-3">Detalle</th><th class="px-4 py-3">Movimiento</th><th class="px-4 py-3">Medio</th><th class="px-4 py-3">Registró</th><th class="px-4 py-3 text-right">Importe neto</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for m in movimientos %}
+            <tr data-filtro-item data-filtro-texto="{{ m.fecha }} {{ m.detalle }} {{ m.tipo_label }} {{ m.referencia }} {{ m.medio }} {{ m.usuario_nombre }} {{ m.orden_id }} {{ m.compra_id }}">
+              <td class="px-4 py-3">{{ m.fecha|fecha }}</td>
+              <td class="px-4 py-3">
+                {% if m.orden_id %}<a class="enlace" href="{{ url_for('orden_detalle', orden_id=m.orden_id) }}">{{ m.orden_id|num_ot }}</a>
+                {% elif m.compra_id %}<a class="enlace" href="{{ url_for('compra_detalle', compra_id=m.compra_id) }}">C-{{ '%05d'|format(m.compra_id) }}</a>
+                {% else %}Gasto{% endif %}
+              </td>
+              <td class="px-4 py-3">{{ m.detalle }}</td>
+              <td class="px-4 py-3">{{ m.tipo_label }}{% if m.referencia %}<span class="block text-xs text-slate-500">{{ m.referencia }}</span>{% endif %}</td>
+              <td class="px-4 py-3">{{ m.medio }}</td>
+              <td class="px-4 py-3">{{ m.usuario_nombre or '—' }}</td>
+              <td class="px-4 py-3 text-right font-medium tabular-nums">{{ m.importe_neto|dinero }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay movimientos que coincidan en esta página del período.</p>
+    {{ paginacion_lista(paginacion) }}
+    </section>
+  {% else %}
+    <p class="tarjeta text-sm text-slate-500">No hay movimientos en este período.</p>
+  {% endif %}
+
+  <section class="tarjeta mt-6">
+    <div class="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold">Cierre de efectivo · {{ hasta|fecha }}</h2><p class="mt-1 text-sm text-slate-500">El saldo esperado suma cobros y resta egresos en efectivo. El inicio se toma del cierre anterior.</p></div>
+      {% if cierre and cierre.estado == 'cerrado' %}<span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Cerrado</span>{% elif cierre and cierre.estado == 'reabierto' %}<span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Reabierto</span>{% endif %}
+    </div>
+    {% if cierre and cierre.estado == 'cerrado' %}
+      <dl class="mb-4 grid gap-3 text-sm sm:grid-cols-4"><div><dt class="text-slate-500">Inicial</dt><dd class="font-semibold">{{ cierre.efectivo_inicial_centavos|dinero }}</dd></div><div><dt class="text-slate-500">Esperado</dt><dd class="font-semibold">{{ cierre.efectivo_esperado_centavos|dinero }}</dd></div><div><dt class="text-slate-500">Contado</dt><dd class="font-semibold">{{ cierre.efectivo_contado_centavos|dinero }}</dd></div><div><dt class="text-slate-500">Diferencia</dt><dd class="font-semibold {{ 'text-emerald-700' if cierre.diferencia_centavos == 0 else 'text-amber-800' }}">{{ cierre.diferencia_centavos|dinero }}</dd></div></dl>
+      {% if cierre.nota %}<p class="mb-4 text-sm text-slate-600">{{ cierre.nota }}</p>{% endif %}
+      <form method="post" action="{{ url_for('caja_reabrir', cierre_id=cierre.id) }}" class="flex flex-wrap gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="sr-only" for="motivo-reabrir">Motivo para reabrir caja</label><input id="motivo-reabrir" class="campo !mt-0 min-w-64 flex-1" name="motivo" minlength="5" maxlength="500" placeholder="Motivo para reabrir" required><button class="btn-peligro" type="submit">Reabrir cierre</button></form>
+    {% else %}
+      <form method="post" action="{{ url_for('caja_cerrar') }}" class="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-4"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="fecha" value="{{ hasta }}">
+        <label class="etiqueta">Efectivo inicial ($)<input class="campo" type="number" name="efectivo_inicial" min="0" step="0.01" value="{{ cierre.efectivo_inicial_centavos|importe_input if cierre and cierre.estado == 'reabierto' else cierre_previo.efectivo_contado_centavos|importe_input if cierre_previo else '' }}" placeholder="Solo si es el primer cierre" {{ 'readonly' if cierre_previo or (cierre and cierre.estado == 'reabierto') }} required></label>
+        <div class="text-sm"><p class="text-slate-500">Movimientos en efectivo desde {{ movimientos_desde|fecha }}</p><p class="mt-1 font-semibold">{{ efectivo_dia|dinero }}</p></div>
+        <label class="etiqueta">Efectivo contado ($)<input class="campo" type="number" name="efectivo_contado" min="0" step="0.01" required></label>
+        <label class="etiqueta xl:col-span-2">Nota<input class="campo" name="nota" maxlength="500" placeholder="Observaciones del cierre"></label>
+        <button class="btn-primario" type="submit" {% if hasta > hoy_iso %}disabled{% endif %}>Cerrar caja</button>
+      </form>
+    {% endif %}
+  </section>
+
+  <section class="tarjeta mt-6" aria-labelledby="titulo-cierres-recientes">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div><p class="modulo-etiqueta">Auditoría de caja</p><h2 id="titulo-cierres-recientes" class="text-lg font-semibold">Historial de cierres</h2><p class="mt-1 text-xs text-slate-500">{{ paginacion_cierres.total }} registros. Las reaperturas conservan usuario, fecha y motivo.</p></div>
+      <a class="enlace text-sm" href="{{ url_for('caja', desde=hoy_iso, hasta=hoy_iso) }}">Ver caja de hoy</a>
+    </div>
+    {% if cierres %}
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table data-mobile-cards class="w-full text-left text-sm">
+          <thead><tr><th class="px-3 py-3">Fecha</th><th class="px-3 py-3">Estado</th><th class="px-3 py-3 text-right">Inicial</th><th class="px-3 py-3 text-right">Esperado</th><th class="px-3 py-3 text-right">Contado</th><th class="px-3 py-3 text-right">Diferencia</th><th class="px-3 py-3">Registró / reapertura</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in cierres %}
+              <tr>
+                <td class="px-3 py-3 whitespace-nowrap"><a class="enlace" href="{{ url_for('caja', desde=c.fecha, hasta=c.fecha) }}">{{ c.fecha|fecha }}</a></td>
+                <td class="px-3 py-3"><span class="rounded-full px-2 py-1 text-xs {{ 'bg-emerald-50 text-emerald-700' if c.estado == 'cerrado' else 'bg-amber-50 text-amber-800' }}">{{ 'Cerrado' if c.estado == 'cerrado' else 'Reabierto' }}</span></td>
+                <td class="px-3 py-3 text-right tabular-nums">{{ c.efectivo_inicial_centavos|dinero }}</td><td class="px-3 py-3 text-right tabular-nums">{{ c.efectivo_esperado_centavos|dinero }}</td><td class="px-3 py-3 text-right tabular-nums">{{ c.efectivo_contado_centavos|dinero }}</td><td class="px-3 py-3 text-right font-semibold tabular-nums">{{ c.diferencia_centavos|dinero }}</td>
+                <td class="px-3 py-3 text-xs text-slate-600">{{ c.usuario_nombre or 'Usuario desactivado' }}{% if c.estado == 'reabierto' %}<span class="block">Reabrió {{ c.reabierto_por_nombre or 'usuario desactivado' }}{% if c.motivo_reapertura %}: {{ c.motivo_reapertura }}{% endif %}</span>{% elif c.nota %}<span class="block">{{ c.nota }}</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {{ paginacion_lista(paginacion_cierres) }}
+    {% else %}
+      <div class="estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">CJ</span><h2>Todavía no hay cierres</h2><p>Los cierres confirmados y las reaperturas aparecerán aquí para consulta.</p></div>
+    {% endif %}
+  </section>
+{% endblock %}

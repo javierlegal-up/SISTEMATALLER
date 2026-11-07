@@ -1,0 +1,11 @@
+{
+  "name": "taller-san-cayetano-assets",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i ./styles/tailwind.css -o ./static/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.cjs -i ./styles/tailwind.css -o ./static/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -5,17 +5,21 @@
 {% block contenido %}
   <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-600">{{ TALLER.nombre }}</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-600">{{ hoy_iso|fecha }} · CENTRO DE OPERACIÓN</p>
       <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Panel del taller</h1>
+      <p class="mt-1 text-sm text-slate-500">Órdenes, inventario y movimientos del negocio en un solo lugar.</p>
     </div>
     <div class="flex flex-wrap gap-3">
-      <a class="btn-acento" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
-      <a class="btn-primario btn-latido" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
+      <a class="btn-secundario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
+      <a class="btn-secundario" href="{{ url_for('compra_nueva') }}">Nueva compra</a>
+      <a class="btn-secundario" href="{{ url_for('analitica') }}">Analítica del negocio</a>
+      <a class="btn-secundario" href="{{ url_for('reportes') }}">Reporte trimestral</a>
+      <a class="btn-primario" href="{{ url_for('orden_nueva') }}">+ Nueva orden</a>
     </div>
   </div>
 
   {# Indicadores. Las dos primeras son alertas rápidas: llevan el detalle rojo. #}
-  <div class="mb-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="mb-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
     <a class="tarjeta group relative overflow-hidden" href="{{ url_for('ordenes', estado='abiertas') }}">
       <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 to-red-600" aria-hidden="true"></span>
       <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Órdenes abiertas</p>
@@ -33,10 +37,20 @@
       <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ resumen.valor_abierto|dinero }}</p>
     </div>
     <div class="tarjeta">
-      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Completado este mes</p>
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Trabajo terminado este mes</p>
       <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ (mes_actual.repuestos + mes_actual.mano_obra)|dinero }}</p>
       <p class="mt-2 text-xs text-slate-500">Mes anterior: <span class="font-semibold text-slate-700">{{ (mes_anterior.repuestos + mes_anterior.mano_obra)|dinero }}</span></p>
     </div>
+    <a class="tarjeta group" href="{{ url_for('caja') }}">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Cobrado este mes</p>
+      <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ ganancias.mes.cobrado|dinero }}</p>
+      <p class="mt-2 text-xs font-medium text-red-600">Ver caja →</p>
+    </a>
+    <a class="tarjeta group" href="{{ url_for('cuentas_cobrar') }}">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Saldo por cobrar</p>
+      <p class="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums xl:text-3xl">{{ resumen.saldo_por_cobrar|dinero }}</p>
+      <p class="mt-2 text-xs font-medium text-red-600">Ver cuentas →</p>
+    </a>
   </div>
 
   <div class="grid gap-6 lg:grid-cols-3">
@@ -51,7 +65,10 @@
           <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-full bg-slate-300"></span>Repuestos</span>
         </div>
       </div>
-      <div id="grafico" class="flex h-40 items-end gap-2 sm:gap-4"></div>
+      <div class="relative">
+        <div id="grafico" class="flex h-40 items-end gap-2 sm:gap-4"></div>
+        <p id="grafico-vacio" hidden class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm font-medium text-slate-500"></p>
+      </div>
       <p id="grafico-detalle" class="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700" aria-live="polite"></p>
     </section>
 
@@ -90,10 +107,13 @@
           </dl>
         </div>
       </div>
-      <form method="post" action="{{ url_for('respaldo_ahora') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="btn-primario" type="submit">Hacer copia ahora</button>
-      </form>
+      <div class="flex flex-wrap gap-2">
+        <form method="post" action="{{ url_for('respaldo_ahora') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn-primario" type="submit">Hacer copia ahora</button>
+        </form>
+        <a class="btn-secundario" href="{{ url_for('restaurar') }}">Restaurar una copia</a>
+      </div>
     </div>
 
     {% if not respaldo_ok %}
@@ -113,6 +133,61 @@
       </div>
     {% endif %}
   </section>
+
+  <section class="mt-8" aria-labelledby="titulo-modulos">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Mapa de trabajo</p>
+        <h2 id="titulo-modulos" class="mt-1 text-xl font-bold">Módulos de gestión</h2>
+      </div>
+      <p class="text-sm text-slate-500">Entrá directo al trabajo que necesitás resolver.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="tarjeta modulo-taller">
+        <p class="modulo-etiqueta">01 · Operación</p>
+        <h3>Atención del taller</h3>
+        <p class="modulo-descripcion">Recibí vehículos, registrá fallas y seguí cada reparación hasta su entrega.</p>
+        <div class="modulo-enlaces">
+          <a href="{{ url_for('ordenes') }}">Órdenes de trabajo <span>→</span></a>
+          <a href="{{ url_for('clientes') }}">Clientes y vehículos <span>→</span></a>
+        </div>
+      </article>
+      <article class="tarjeta modulo-stock">
+        <p class="modulo-etiqueta">02 · Abastecimiento</p>
+        <h3>Repuestos y compras</h3>
+        <p class="modulo-descripcion">Mantené artículos, proveedores, recepciones y existencias conectados.</p>
+        <div class="modulo-enlaces">
+          <a href="{{ url_for('inventario') }}">Inventario <span>→</span></a>
+          <a href="{{ url_for('compras') }}">Compras y recepciones <span>→</span></a>
+          <a href="{{ url_for('proveedores') }}">Proveedores <span>→</span></a>
+          <a href="{{ url_for('catalogo') }}">Catálogo de artículos <span>→</span></a>
+        </div>
+      </article>
+      <article class="tarjeta modulo-finanzas">
+        <p class="modulo-etiqueta">03 · Administración</p>
+        <h3>Caja y cuentas</h3>
+        <p class="modulo-descripcion">Registrá cobros, pagos y gastos; consultá saldos y cerrá efectivo.</p>
+        <div class="modulo-enlaces">
+          <a href="{{ url_for('caja') }}">Caja y cierres <span>→</span></a>
+          <a href="{{ url_for('cuentas_cobrar') }}">Cuentas por cobrar <span>→</span></a>
+          <a href="{{ url_for('cuentas_pagar') }}">Cuentas por pagar <span>→</span></a>
+          <a href="{{ url_for('gastos') }}">Gastos <span>→</span></a>
+        </div>
+      </article>
+      <article class="tarjeta modulo-control">
+        <p class="modulo-etiqueta">04 · Control</p>
+        <h3>Resultados y sistema</h3>
+        <p class="modulo-descripcion">Revisá indicadores, actividad del equipo y recuperación de los datos.</p>
+        <div class="modulo-enlaces">
+          <a href="{{ url_for('analitica') }}">Analítica del negocio <span>→</span></a>
+          <a href="{{ url_for('reportes') }}">Reportes gráficos <span>→</span></a>
+          <a href="{{ url_for('actividad') }}">Actividad del equipo <span>→</span></a>
+          <a href="{{ url_for('usuarios') }}">Usuarios y permisos <span>→</span></a>
+          <a href="{{ url_for('restaurar') }}">Copias y restauración <span>→</span></a>
+        </div>
+      </article>
+    </div>
+  </section>
 {% endblock %}
 
 {% block scripts %}
@@ -122,7 +197,15 @@
     const dinero = (centavos) => "$" + moneda.format(centavos / 100);
     const totalMes = (mes) => mes.repuestos + mes.mano_obra;
     const grafico = document.getElementById("grafico");
-    const maximo = Math.max(...MESES.map(totalMes), 1);
+    const maximoReal = Math.max(...MESES.map(totalMes), 0);
+    const maximo = Math.max(maximoReal, 1);
+    const graficoVacio = document.getElementById("grafico-vacio");
+    if (maximoReal === 0) {
+      graficoVacio.hidden = false;
+      graficoVacio.textContent = MESES.some((mes) => mes.ordenes > 0)
+        ? "Hay órdenes completadas, pero todavía no tienen importes para graficar."
+        : "Todavía no hay órdenes completadas en estos seis meses.";
+    }
 
     function mostrarMes(indice) {
       const mes = MESES[indice];
@@ -141,7 +224,7 @@
       barra.setAttribute("aria-label", `${mes.etiqueta}: ${dinero(totalMes(mes))}`);
 
       const pila = document.createElement("div");
-      pila.className = "flex min-h-0 flex-1 flex-col justify-end overflow-hidden rounded-t-lg";
+      pila.className = "flex min-h-0 flex-1 flex-col justify-end overflow-hidden rounded-t-lg border-b border-slate-200";
       [[mes.repuestos, "bg-slate-300"], [mes.mano_obra, "bg-gradient-to-t from-red-600 to-red-500"]].forEach(([valor, color]) => {
         const tramo = document.createElement("div");
         tramo.className = "w-full " + color;

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}{{ proveedor.nombre }}{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="modulo-etiqueta">Abastecimiento · proveedor</p>
+      <h1>{{ proveedor.nombre }}</h1>
+      <p class="mt-1 text-sm text-slate-500">Ficha de contacto, compras y saldo construido desde recepciones y pagos registrados.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn-secundario" href="{{ url_for('proveedores') }}">Volver al directorio</a>
+      <a class="btn-secundario" href="{{ url_for('cuentas_pagar') }}">Cuentas por pagar</a>
+      {% if proveedor.activo %}<a class="btn-primario" href="{{ url_for('compra_nueva', proveedor_id=proveedor.id) }}">Nueva compra</a>{% endif %}
+    </div>
+  </header>
+
+  <section class="tarjeta mb-5 grid gap-5 lg:grid-cols-[minmax(15rem,.8fr)_2fr]">
+    <div>
+      <div class="flex items-center gap-2"><h2 class="text-lg font-semibold">Contacto</h2><span class="rounded-full px-2 py-1 text-xs font-semibold {{ 'bg-emerald-50 text-emerald-700' if proveedor.activo else 'bg-slate-100 text-slate-600' }}">{{ 'Activo' if proveedor.activo else 'Archivado' }}</span></div>
+      <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
+        <div><dt class="text-xs text-slate-500">CUIT / documento</dt><dd class="mt-1 font-medium">{{ proveedor.documento or '—' }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Teléfono</dt><dd class="mt-1 font-medium">{{ proveedor.telefono or '—' }}</dd></div>
+        <div><dt class="text-xs text-slate-500">Email</dt><dd class="mt-1 break-all font-medium">{% if proveedor.email %}<a class="enlace" href="mailto:{{ proveedor.email }}">{{ proveedor.email }}</a>{% else %}—{% endif %}</dd></div>
+        <div><dt class="text-xs text-slate-500">Dirección</dt><dd class="mt-1 font-medium">{{ proveedor.direccion or '—' }}</dd></div>
+      </dl>
+      <a class="enlace mt-4 inline-block text-sm" href="{{ url_for('proveedores', editar=proveedor.id) }}">Editar datos del proveedor</a>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="kpi-operativo"><p>Compras asociadas</p><strong>{{ compras_total }}</strong><span>Incluye borradores y anuladas</span></article>
+      <article class="kpi-operativo"><p>Recibido</p><strong>{{ recibido_total|dinero }}</strong><span>Recepciones vigentes</span></article>
+      <article class="kpi-operativo"><p>Pagado</p><strong>{{ pagado_total|dinero }}</strong><span>Menos reversiones registradas</span></article>
+      <article class="kpi-operativo {{ 'kpi-alerta' if saldo_total }}"><p>Saldo pendiente</p><strong>{{ saldo_total|dinero }}</strong><span>Sobre artículos recibidos</span></article>
+    </div>
+  </section>
+
+  <section class="tarjeta" data-filtro-lista aria-labelledby="titulo-compras-proveedor">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 id="titulo-compras-proveedor" class="text-lg font-semibold">Compras asociadas</h2><p class="mt-1 text-sm text-slate-500">Cada compra abre su detalle para registrar recepción, pago o reversión auditada.</p></div><span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span></div>
+    {% if compras %}
+      <label class="mb-3 block max-w-xl text-xs font-semibold text-slate-600">Buscar compra<input class="campo" type="search" data-filtro-busqueda placeholder="Documento, estado o fecha…" aria-label="Buscar compra de este proveedor"></label>
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table data-mobile-cards class="w-full text-left text-sm">
+          <thead><tr><th class="px-3 py-3">Compra</th><th class="px-3 py-3">Fecha</th><th class="px-3 py-3">Documento</th><th class="px-3 py-3">Estado</th><th class="px-3 py-3 text-right">Pedido</th><th class="px-3 py-3 text-right">Recibido</th><th class="px-3 py-3 text-right">Pagado</th><th class="px-3 py-3 text-right">Saldo</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in compras %}
+              <tr data-filtro-item data-filtro-texto="C-{{ '%05d'|format(c.id) }} {{ c.fecha }} {{ c.documento }} {{ c.estado }}">
+                <td class="px-3 py-3"><a class="enlace font-mono" href="{{ url_for('compra_detalle', compra_id=c.id) }}">C-{{ '%05d'|format(c.id) }}</a></td>
+                <td class="px-3 py-3 whitespace-nowrap">{{ c.fecha|fecha }}</td><td class="px-3 py-3">{{ c.documento or '—' }}</td>
+                <td class="px-3 py-3">{{ c.estado }}</td><td class="px-3 py-3 text-right tabular-nums">{{ c.valor_pedido_centavos|dinero }}</td>
+                <td class="px-3 py-3 text-right tabular-nums">{{ c.total|dinero }}</td><td class="px-3 py-3 text-right tabular-nums">{{ c.pagado|dinero }}</td>
+                <td class="px-3 py-3 text-right font-semibold tabular-nums">{{ c.saldo|dinero }}</td>
+              </tr>
+            {% else %}<tr><td colspan="8" class="px-3 py-8 text-center text-slate-500">Este proveedor todavía no tiene compras.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay compras que coincidan en esta página.</p>
+      {{ paginacion_lista(paginacion) }}
+    {% else %}
+      <div class="estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">C-</span><h2>Sin compras asociadas</h2><p>Cuando registres una compra para este proveedor aparecerá aquí con su historial de recepciones y pagos.</p>{% if proveedor.activo %}<a class="btn-primario mt-4" href="{{ url_for('compra_nueva', proveedor_id=proveedor.id) }}">Crear primera compra</a>{% endif %}</div>
+    {% endif %}
+  </section>
+{% endblock %}

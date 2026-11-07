@@ -151,6 +151,27 @@ window.Graficos = (() => {
         const sensible = nodo("rect", { x: izquierda + anchoGrupo * i, y: 0, width: anchoGrupo, height: alto, fill: "transparent" }, svg);
         sensible.addEventListener("mousemove", mostrar);
         sensible.addEventListener("mouseleave", esconder);
+        if (typeof opciones.alSeleccionar === "function") {
+          const titulo = opciones.titulos ? opciones.titulos[i] : etiqueta;
+          const seleccionar = () => opciones.alSeleccionar({
+            indice: i,
+            etiqueta,
+            titulo,
+            segmento: opciones.segmentos ? opciones.segmentos[i] : null,
+            series: estado.series.map((serie) => ({ nombre: serie.nombre, valor: serie.valores[i] })),
+          });
+          sensible.setAttribute("role", "link");
+          sensible.setAttribute("tabindex", "0");
+          sensible.setAttribute("aria-label", `Abrir movimientos de ${titulo}`);
+          sensible.style.cursor = "pointer";
+          sensible.addEventListener("click", seleccionar);
+          sensible.addEventListener("keydown", (evento) => {
+            if (evento.key === "Enter" || evento.key === " ") {
+              evento.preventDefault();
+              seleccionar();
+            }
+          });
+        }
 
         series.forEach((serie, j) => {
           const valor = serie.valores[i];

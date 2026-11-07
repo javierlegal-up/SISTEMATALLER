@@ -5,38 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Inicio{% endblock %} · {{ TALLER.nombre }}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
     // Se aplica antes de dibujar la página, para que el menú contraído no "salte" al cargar.
     if (localStorage.getItem("menuColapsado") === "1") {
       document.documentElement.classList.add("menu-colapsado");
     }
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    // TEMA BLANCO Y ROJO.
-    // Las plantillas usan "blue" para enlaces, foco y detalles. Aquí esa paleta se
-    // redefine con los tonos de rojo, así todo el sistema queda en rojo sin tocar
-    // cada pantalla. El comprobante impreso no usa esta configuración.
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            // Inter si hay Internet; si no, la fuente del sistema.
-            sans: ["Inter", "ui-sans-serif", "system-ui", "Segoe UI", "sans-serif"],
-          },
-          colors: {
-            blue: {
-              50: "#fef2f2", 100: "#fee2e2", 200: "#fecaca", 300: "#fca5a5", 400: "#f87171",
-              500: "#ef4444", 600: "#dc2626", 700: "#b91c1c", 800: "#991b1b", 900: "#7f1d1d",
-            },
-          },
-        },
-      },
-    };
-  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
   <style>
     input[type="checkbox"] { accent-color: #dc2626; }
 
@@ -83,46 +58,7 @@
       .btn, .btn::before, .btn-latido, .enlace-menu, #barra { animation: none !important; transition: none !important; }
     }
   </style>
-  <style type="text/tailwindcss">
-    @layer components {
-      .campo { @apply mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-all duration-200 focus:border-red-400 focus:outline-none focus:ring-4 focus:ring-red-500/10; }
-      .etiqueta { @apply block text-sm font-medium tracking-tight text-slate-700; }
-      .tarjeta { @apply rounded-2xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/60 transition-all duration-300 hover:shadow-md; }
-
-      /* BOTONES CON MOVIMIENTO.
-         El movimiento ocurre DENTRO del botón (brillo, relleno, resplandor): el botón no se
-         desplaza, así nunca "tiembla" bajo el puntero. Al hacer clic se hunde un poco. */
-      .btn { @apply relative isolate inline-flex cursor-pointer select-none items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-center text-sm font-semibold tracking-tight transition-all duration-300 ease-out active:scale-[0.97]; }
-      .btn:disabled { @apply pointer-events-none opacity-50; }
-
-      /* Rojo: un brillo recorre el botón y aparece un resplandor rojo alrededor. */
-      .btn-primario { @apply btn bg-gradient-to-b from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:from-red-500 hover:to-red-700 hover:shadow-xl hover:shadow-red-500/50 hover:ring-4 hover:ring-red-500/20; }
-      .btn-primario::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: -1;  /* Por encima del fondo rojo, por debajo del texto. */
-        background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, .45) 50%, transparent 75%);
-        transform: translateX(-110%);
-        transition: transform .7s ease;
-      }
-      .btn-primario:hover::before { transform: translateX(110%); }
-
-      /* Blancos: se llenan de rojo de izquierda a derecha y el texto pasa a blanco. */
-      .btn-acento { @apply btn border border-red-200 bg-white text-red-700 shadow-lg shadow-red-500/10 hover:border-red-600 hover:text-white hover:shadow-red-500/40; }
-      .btn-secundario { @apply btn border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-red-600 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
-      .btn-peligro { @apply btn border border-red-200 bg-white text-red-700 shadow-sm hover:border-red-700 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
-      .btn-acento, .btn-secundario, .btn-peligro {
-        background-image: linear-gradient(to right, #dc2626, #ef4444);
-        background-repeat: no-repeat;
-        background-position: left center;
-        background-size: 0% 100%;
-      }
-      .btn-acento:hover, .btn-secundario:hover, .btn-peligro:hover { background-size: 100% 100%; }
-
-      .enlace { @apply font-medium text-red-600 transition-colors hover:text-red-700 hover:underline hover:underline-offset-4; }
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='erp.css') }}">
 </head>
 
 {# Iconos de la barra lateral (trazos de Heroicons, 24x24). #}
@@ -140,6 +76,12 @@
   'usuarios': 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
   'actividad': 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
   'reportes': 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6zM13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z',
+  'compras': 'M3 3h2l2.1 10.2a2 2 0 002 1.6h8.8a2 2 0 001.9-1.4L21 7H6M10 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z',
+  'inventario': 'M4 7.5 12 3l8 4.5-8 4.5-8-4.5zM4 12l8 4.5 8-4.5M4 16.5 12 21l8-4.5',
+  'gastos': 'M12 6v12m6-9.5C18 6.6 15.3 5 12 5S6 6.6 6 8.5 8.7 12 12 12s6 1.6 6 3.5-2.7 3.5-6 3.5-6-1.6-6-3.5',
+  'caja': 'M3.75 7.5h16.5M6 4.5h12a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0118 19.5H6a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 016 4.5zm9 8.25h3',
+  'cuentas': 'M4.5 6.75h15m-15 5.25h15m-15 5.25h9M6 3.75h12A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75z',
+  'respaldo': 'M7.5 18.75h9a4.5 4.5 0 00.97-8.894 5.998 5.998 0 00-11.94-.01A4.5 4.5 0 007.5 18.75zm4.5-7.5v6m0-6l-2.25 2.25M12 11.25l2.25 2.25',
   'salir':'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75',
   'flecha': 'M15.75 19.5L8.25 12l7.5-7.5',
 } %}
@@ -163,11 +105,13 @@
 {% endmacro %}
 
 <body class="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased md:flex">
+  <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
   {% set pantalla = request.endpoint %}
   {% set vista = request.args.get('estado', '') %}
   {# Sin sesión iniciada (pantalla de ingreso) no se muestra el menú. #}
   {% if usuario %}
-  <aside id="barra" class="flex flex-col border-r border-slate-100 bg-white md:sticky md:top-0 md:h-screen md:w-72 md:shrink-0 md:overflow-y-auto md:overflow-x-hidden md:transition-[width] md:duration-300 md:ease-out">
+  <button id="menu-sombra" type="button" aria-label="Cerrar menú" aria-hidden="true" tabindex="-1"></button>
+  <aside id="barra" aria-label="Navegación del sistema" class="flex flex-col border-r border-slate-100 bg-white md:sticky md:top-0 md:h-screen md:w-72 md:shrink-0 md:overflow-y-auto md:overflow-x-hidden md:transition-[width] md:duration-300 md:ease-out">
     <div class="cabecera-menu flex items-center gap-3 px-6 pb-4 pt-6">
       <img src="{{ url_for('static', filename='logo.svg') }}" alt="" class="h-11 w-11 shrink-0 rounded-xl shadow-lg shadow-red-500/30" width="44" height="44">
       <a href="{{ url_for('inicio') }}" class="solo-abierto flex-1 text-[15px] font-extrabold uppercase leading-tight tracking-wide text-slate-900">{{ TALLER.nombre }}</a>
@@ -180,13 +124,11 @@
     </div>
 
     <nav class="nav-menu flex-1 space-y-7 px-6 py-4" aria-label="Menú principal">
-      {% if es_dueno %}
-        <div class="space-y-1">
-          {{ enlace_menu(url_for('inicio'), 'Panel', pantalla == 'inicio', icono_nombre='panel') }}
-        </div>
-      {% endif %}
-      <div class="space-y-1">
-        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Órdenes de trabajo</p>
+      <section class="space-y-1" aria-label="Resumen">
+        {{ enlace_menu(url_for('inicio'), 'Panel', pantalla == 'inicio', icono_nombre='panel') }}
+      </section>
+      <section class="space-y-1" aria-label="Taller">
+        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Taller</p>
         {# Solo aparece cuando hay algo para cotizar (o si ya estás en esa lista). #}
         {% if es_dueno and (nav_conteos['sin_precio'] or vista == 'sin_precio') %}
           {{ enlace_menu(url_for('ordenes', estado='sin_precio'), 'Falta poner precio', pantalla == 'ordenes' and vista == 'sin_precio', 'sin_precio', 'precio') }}
@@ -197,20 +139,39 @@
         {% if es_dueno %}
           {{ enlace_menu(url_for('ordenes', estado='Completado'), 'Completadas', pantalla == 'ordenes' and vista == 'Completado', 'Completado', 'completado') }}
           {{ enlace_menu(url_for('ordenes'), 'Todas', pantalla == 'ordenes' and vista not in ('Pendiente', 'En Proceso', 'Completado', 'sin_precio'), icono_nombre='todas') }}
+          {{ enlace_menu(url_for('ordenes', estado='anuladas'), 'Órdenes anuladas', pantalla == 'ordenes' and vista == 'anuladas', 'anuladas', 'reportes') }}
         {% endif %}
         {{ enlace_menu(url_for('orden_nueva'), '+ Nueva orden', pantalla == 'orden_nueva', icono_nombre='nueva') }}
-      </div>
-      <div class="space-y-1">
-        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{{ 'Administración' if es_dueno else 'Registro' }}</p>
+      </section>
+      <section class="space-y-1" aria-label="Clientes y vehículos">
+        <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Clientes y vehículos</p>
         {{ enlace_menu(url_for('clientes'), 'Clientes', pantalla in ('clientes', 'cliente_nuevo', 'cliente_detalle', 'cliente_editar'), icono_nombre='clientes') }}
         {{ enlace_menu(url_for('vehiculos'), 'Vehículos', pantalla in ('vehiculos', 'vehiculo_detalle', 'vehiculo_editar'), icono_nombre='vehiculos') }}
-        {% if es_dueno %}
+      </section>
+      {% if es_dueno %}
+        <section class="space-y-1" aria-label="Abastecimiento e inventario">
+          <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Abastecimiento</p>
           {{ enlace_menu(url_for('catalogo'), 'Lista de precios', pantalla == 'catalogo', icono_nombre='lista') }}
-          {{ enlace_menu(url_for('usuarios'), 'Usuarios', pantalla == 'usuarios', icono_nombre='usuarios') }}
-          {{ enlace_menu(url_for('actividad'), 'Actividad', pantalla == 'actividad', icono_nombre='actividad') }}
+          {{ enlace_menu(url_for('proveedores'), 'Proveedores', pantalla in ('proveedores', 'proveedor_detalle', 'proveedor_cambiar_estado'), icono_nombre='clientes') }}
+          {{ enlace_menu(url_for('compras'), 'Compras', pantalla in ('compras', 'compra_nueva', 'compra_detalle', 'compra_recibir', 'compra_anular'), icono_nombre='compras') }}
+          {{ enlace_menu(url_for('inventario'), 'Inventario', pantalla in ('inventario', 'inventario_ajustar', 'inventario_revertir'), icono_nombre='inventario') }}
+        </section>
+        <section class="space-y-1" aria-label="Finanzas">
+          <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Finanzas</p>
+          {{ enlace_menu(url_for('caja'), 'Caja', pantalla == 'caja', icono_nombre='caja') }}
+          {{ enlace_menu(url_for('cuentas_cobrar'), 'Cuentas por cobrar', pantalla == 'cuentas_cobrar', icono_nombre='cuentas') }}
+          {{ enlace_menu(url_for('cuentas_pagar'), 'Cuentas por pagar', pantalla == 'cuentas_pagar', icono_nombre='reportes') }}
+          {{ enlace_menu(url_for('gastos'), 'Gastos', pantalla in ('gastos', 'gasto_revertir'), icono_nombre='gastos') }}
+        </section>
+        <section class="space-y-1" aria-label="Control y administración">
+          <p class="solo-abierto px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Control</p>
+          {{ enlace_menu(url_for('analitica'), 'Analítica del negocio', pantalla == 'analitica', icono_nombre='reportes') }}
           {{ enlace_menu(url_for('reportes'), 'Reportes', pantalla == 'reportes', icono_nombre='reportes') }}
-        {% endif %}
-      </div>
+          {{ enlace_menu(url_for('actividad'), 'Actividad', pantalla == 'actividad', icono_nombre='actividad') }}
+          {{ enlace_menu(url_for('usuarios'), 'Usuarios', pantalla == 'usuarios', icono_nombre='usuarios') }}
+          {{ enlace_menu(url_for('restaurar'), 'Copias y restauración', pantalla == 'restaurar', icono_nombre='respaldo') }}
+        </section>
+      {% endif %}
     </nav>
 
     {# Tarjeta flotante del usuario. Contraída, queda solo la inicial y el botón de salir. #}
@@ -233,9 +194,28 @@
   {% endif %}
 
   <div class="min-w-0 flex-1">
-    <main class="mx-auto max-w-6xl px-4 py-8 md:px-10">
+    {% if usuario %}
+      <header class="app-bar">
+        <div class="flex min-w-0 items-center gap-3">
+          <button id="abrir-menu" type="button" aria-expanded="false" aria-controls="barra" aria-label="Abrir menú de navegación">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <div class="app-bar-context">
+            <span class="app-bar-title">{{ self.titulo()|striptags }}</span>
+            <span class="app-bar-meta">{{ TALLER.nombre }} · {{ NOMBRES_ROL[usuario.rol] }}</span>
+          </div>
+        </div>
+        <form class="app-search" action="{{ url_for('ordenes') }}" method="get" role="search">
+          <label class="sr-only" for="busqueda-global">Buscar órdenes por cliente, patente, marca o modelo</label>
+          <input id="busqueda-global" type="search" name="q" value="{{ request.args.get('q', '') if pantalla == 'ordenes' else '' }}" placeholder="Buscar órdenes: cliente, patente…">
+          <button type="submit">Buscar</button>
+        </form>
+        <span class="app-local-badge">Local · {{ hoy_iso|fecha }}</span>
+      </header>
+    {% endif %}
+    <main id="contenido-principal" class="mx-auto max-w-6xl px-4 py-8 md:px-10" tabindex="-1">
       {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
-        <div class="mb-5 flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-sm {{ 'border-red-100 bg-red-50/80 text-red-800' if categoria == 'error' else 'border-emerald-100 bg-emerald-50/80 text-emerald-800' }}" role="status">
+        <div class="mb-5 flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-sm {{ 'border-red-100 bg-red-50/80 text-red-800' if categoria == 'error' else 'border-emerald-100 bg-emerald-50/80 text-emerald-800' }}" role="{{ 'alert' if categoria == 'error' else 'status' }}" aria-live="{{ 'assertive' if categoria == 'error' else 'polite' }}">
           <span class="mt-0.5 h-2 w-2 shrink-0 rounded-full {{ 'bg-red-500' if categoria == 'error' else 'bg-emerald-500' }}" aria-hidden="true"></span>
           <span>{{ mensaje }}</span>
         </div>
@@ -245,6 +225,7 @@
   </div>
 
   {% if usuario %}
+    <script src="{{ url_for('static', filename='erp.js') }}" defer></script>
     <script>
       // Flechita del menú: contrae o expande, y recuerda la elección en este navegador.
       (() => {
@@ -261,6 +242,45 @@
           actualizar();
         });
         actualizar();
+      })();
+      (() => {
+        const raiz = document.documentElement;
+        const boton = document.getElementById("abrir-menu");
+        const sombra = document.getElementById("menu-sombra");
+        const barra = document.getElementById("barra");
+        const pagina = document.querySelector(".min-w-0.flex-1");
+        const mq = window.matchMedia("(max-width: 767px)");
+        let focoAnterior = null;
+        const cerrar = (restaurarFoco = true) => {
+          raiz.classList.remove("menu-movil-abierto");
+          boton.setAttribute("aria-expanded", "false");
+          sombra.setAttribute("aria-hidden", "true");
+          pagina.inert = false;
+          if (restaurarFoco && focoAnterior) focoAnterior.focus();
+        };
+        boton.addEventListener("click", () => {
+          focoAnterior = boton;
+          raiz.classList.add("menu-movil-abierto");
+          boton.setAttribute("aria-expanded", "true");
+          sombra.setAttribute("aria-hidden", "false");
+          pagina.inert = true;
+          barra.querySelector("a")?.focus();
+        });
+        sombra.addEventListener("click", () => cerrar());
+        barra.addEventListener("click", (evento) => {
+          if (mq.matches && evento.target.closest("a")) cerrar(false);
+        });
+        document.addEventListener("keydown", (evento) => {
+          if (evento.key === "Escape" && raiz.classList.contains("menu-movil-abierto")) cerrar();
+          if (evento.key === "Tab" && raiz.classList.contains("menu-movil-abierto")) {
+            const controles = [...barra.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+            const primero = controles[0];
+            const ultimo = controles[controles.length - 1];
+            if (evento.shiftKey && document.activeElement === primero) { evento.preventDefault(); ultimo.focus(); }
+            else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primero.focus(); }
+          }
+        });
+        mq.addEventListener("change", (evento) => { if (!evento.matches) cerrar(false); });
       })();
     </script>
   {% endif %}

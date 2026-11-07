@@ -2,20 +2,39 @@
 {% from "_macros.html" import paginacion_lista %}
 {% block titulo %}{{ titulo }}{% endblock %}
 {% block contenido %}
-  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold">{{ titulo }} <span class="text-lg font-normal text-slate-500">(<span id="total-lista">{{ paginacion.total }}</span>)</span></h1>
+  <header class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Taller · seguimiento de reparaciones</p>
+      <h1 class="mt-1">{{ titulo }} <span class="text-base font-medium text-slate-500">(<span id="total-lista">{{ paginacion.total }}</span>)</span></h1>
+      <p class="mt-1 text-sm text-slate-500">Abrí una orden para revisar el trabajo, registrar el consumo y actualizar el estado.</p>
+    </div>
     <a class="btn-primario" href="{{ url_for('orden_nueva') }}">Nueva orden</a>
-  </div>
+  </header>
 
-  <form method="get" class="mb-4 flex gap-2">
+  <form method="get" class="tarjeta mb-4 grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_12rem_12rem_auto_auto]">
     {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
-    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por cliente, patente, marca o modelo" aria-label="Buscar órdenes">
-    <button class="btn-secundario" type="submit">Buscar</button>
-    {% if busqueda %}<a class="btn-secundario" href="{{ url_for('ordenes', estado=estado) if estado else url_for('ordenes') }}">Limpiar</a>{% endif %}
+    <label class="etiqueta sm:col-span-2 xl:col-span-1">Buscar en órdenes<input class="campo" type="search" name="q" value="{{ busqueda }}" placeholder="Cliente, teléfono, patente, falla o diagnóstico" aria-label="Buscar órdenes por cliente, teléfono, patente, falla o diagnóstico"></label>
+    <label class="etiqueta">Prioridad<select class="campo" name="prioridad"><option value="">Todas</option>{% for p in PRIORIDADES_ORDEN %}<option value="{{ p }}" {{ 'selected' if prioridad == p }}>{{ p }}</option>{% endfor %}</select></label>
+    <label class="etiqueta">Fecha prometida<select class="campo" name="vencimiento"><option value="">Cualquier fecha</option><option value="vencida" {{ 'selected' if vencimiento == 'vencida' }}>Vencidas</option><option value="hoy" {{ 'selected' if vencimiento == 'hoy' }}>Vencen hoy</option><option value="programada" {{ 'selected' if vencimiento == 'programada' }}>Programadas</option><option value="sin_fecha" {{ 'selected' if vencimiento == 'sin_fecha' }}>Sin fecha</option></select></label>
+    <button class="btn-primario" type="submit">Aplicar</button>
+    {% if busqueda or prioridad or vencimiento %}<a class="btn-secundario" href="{{ url_for('ordenes', estado=estado) if estado else url_for('ordenes') }}">Limpiar</a>{% endif %}
   </form>
 
+  {% set filtros = [('Todas', ''), ('Abiertas', 'abiertas'), ('Atrasadas', 'atrasadas'), ('Pendientes', 'Pendiente'), ('En proceso', 'En Proceso')] %}
+  {% if es_dueno %}
+    {% set filtros = filtros + [('Falta precio', 'sin_precio'), ('Completadas', 'Completado'), ('Anuladas', 'anuladas')] %}
+  {% endif %}
+  <nav class="filtros-orden mb-5" aria-label="Filtrar órdenes">
+    {% for texto, clave in filtros %}
+      {% set seleccionada = (estado == clave) %}
+      <a href="{{ url_for('ordenes', estado=clave, q=busqueda or none, prioridad=prioridad or none, vencimiento=vencimiento or none) if clave else url_for('ordenes', q=busqueda or none, prioridad=prioridad or none, vencimiento=vencimiento or none) }}" {% if seleccionada %}aria-current="page"{% endif %}>
+        {{ texto }}{% if clave in nav_conteos and (nav_conteos[clave] or seleccionada) %}<span>{{ nav_conteos[clave] }}</span>{% endif %}
+      </a>
+    {% endfor %}
+  </nav>
+
   {% if ordenes %}
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="ordenes-tabla overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-sm">
         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
@@ -23,20 +42,47 @@
             <th class="px-4 py-3">Cliente</th>
             <th class="px-4 py-3">Vehículo</th>
             <th class="px-4 py-3">Falla</th>
-            <th class="px-4 py-3">{{ 'Finalización' if estado == 'Completado' else 'Tiempo' }}</th>
+            <th class="px-4 py-3">Plazo / {{ 'finalización' if estado == 'Completado' else 'ingreso' }}</th>
             <th class="px-4 py-3">Estado</th>
             {% if es_dueno %}<th class="px-4 py-3 text-right">Total</th>{% endif %}
             <th class="px-4 py-3 text-right">Mover a</th>
           </tr>
         </thead>
-        <tbody id="filas" class="divide-y divide-slate-100" data-vista="{{ estado }}">
+        <tbody id="filas" class="divide-y divide-slate-100" data-vista="{{ estado }}" data-prioridad="{{ prioridad }}" data-vencimiento="{{ vencimiento }}" data-busqueda="{{ busqueda }}">
           {% for o in ordenes %}{% include "_fila_orden.html" %}{% endfor %}
         </tbody>
       </table>
     </div>
+    <div class="ordenes-movil" aria-label="Lista de órdenes">
+      {% for o in ordenes %}
+        <article class="tarjeta orden-movil-card">
+          <div class="flex items-start justify-between gap-3">
+            <a class="orden-numero" href="{{ url_for('orden_detalle', orden_id=o.id) }}">{{ o.id|num_ot }}</a>
+            <span class="estado-orden estado-{{ o.estado|lower|replace(' ', '-') }}">{{ 'Anulada' if o.anulada else o.estado }}</span>
+          </div>
+          <h2 class="mt-3 text-base font-bold">{{ o.cliente_nombre }}</h2>
+          <p class="mt-0.5 font-mono text-sm font-semibold text-slate-600">{{ o.patente }} <span class="font-sans font-normal">· {{ o.marca }} {{ o.modelo }}</span></p>
+          <p class="mt-3 line-clamp-2 text-sm text-slate-600">{{ o.fallas or 'Sin detalle de falla.' }}</p>
+          <div class="mt-3 flex flex-wrap gap-2 text-xs"><span class="prioridad-badge prioridad-{{ o.prioridad|lower }}">{{ o.prioridad }}</span>{% if o.fecha_prometida %}<span class="plazo-badge {{ 'plazo-vencido' if o.vencida else 'plazo-hoy' if o.vence_hoy else '' }}">Entrega · {{ o.fecha_prometida|fecha }}{% if o.vencida %} · vencida{% elif o.vence_hoy %} · hoy{% endif %}</span>{% else %}<span class="plazo-badge">Sin fecha comprometida</span>{% endif %}</div>
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500">
+            <span>{{ 'Completada' if estado == 'Completado' else 'Ingreso' }} · {{ o.fecha_completado|fecha if estado == 'Completado' else o.fecha_ingreso|fecha }}</span>
+            {% if es_dueno and not o.anulada %}<strong class="text-sm text-slate-800">{{ o.total|dinero }}</strong>{% endif %}
+          </div>
+          <a class="btn-secundario mt-3 w-full" href="{{ url_for('orden_detalle', orden_id=o.id) }}">Abrir orden</a>
+        </article>
+      {% endfor %}
+    </div>
     {{ paginacion_lista(paginacion) }}
   {% else %}
-    <p class="tarjeta text-sm text-slate-500">No hay órdenes para mostrar.</p>
+    <div class="tarjeta estado-vacio">
+      <span class="estado-vacio-icono" aria-hidden="true">OT</span>
+      <h2>No hay órdenes en esta vista</h2>
+      <p>{% if busqueda %}Probá con otro cliente, patente, marca o modelo, o limpiá la búsqueda.{% else %}Cuando registres un vehículo, podés abrir su orden y seguir el trabajo desde acá.{% endif %}</p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        {% if busqueda %}<a class="btn-secundario" href="{{ url_for('ordenes', estado=estado) if estado else url_for('ordenes') }}">Limpiar búsqueda</a>{% endif %}
+        <a class="btn-primario" href="{{ url_for('orden_nueva') }}">Crear orden</a>
+      </div>
+    </div>
   {% endif %}
 
   <dialog id="ventana-orden" class="w-full max-w-lg rounded-2xl border border-neutral-200 border-t-4 border-t-red-600 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-neutral-900/50"></dialog>
@@ -58,11 +104,26 @@
       setTimeout(() => aviso.remove(), esError ? 6000 : 2500);
     }
 
-    function sigueEnLaLista(estado) {
+    function textoComparable(valor) {
+      return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
+    }
+
+    function sigueEnLaLista(estado, fila) {
       const vista = filas.dataset.vista;
-      if (vista === "") return true;
-      if (vista === "abiertas" || vista === "atrasadas") return estado !== "Completado";
-      return vista === estado;
+      const coincideEstado = vista === "" ||
+        ((vista === "abiertas" || vista === "atrasadas") && estado !== "Completado") || vista === estado;
+      if (!coincideEstado) return false;
+      if (filas.dataset.prioridad && fila.dataset.prioridad !== filas.dataset.prioridad) return false;
+      const fecha = fila.dataset.fechaPrometida;
+      const hoy = {{ hoy_iso|tojson }};
+      const filtroPlazo = filas.dataset.vencimiento;
+      if (filtroPlazo === "vencida" && !(fecha && fecha < hoy && estado !== "Completado")) return false;
+      if (filtroPlazo === "hoy" && !(fecha === hoy && estado !== "Completado")) return false;
+      if (filtroPlazo === "programada" && !(fecha && fecha > hoy && estado !== "Completado")) return false;
+      if (filtroPlazo === "sin_fecha" && !(fecha === "" && estado !== "Completado")) return false;
+      const busqueda = textoComparable(filas.dataset.busqueda);
+      if (busqueda && !textoComparable(fila.dataset.texto).includes(busqueda)) return false;
+      return true;
     }
 
     // La fila solo cambia cuando el servidor confirma que guardó el cambio.
@@ -86,7 +147,7 @@
       }
 
       const numero = fila.dataset.numero;
-      if (sigueEnLaLista(estado)) {
+      if (sigueEnLaLista(estado, fila)) {
         fila.outerHTML = datos.fila;
       } else {
         fila.remove();

@@ -2,8 +2,9 @@
 {% block titulo %}{{ cliente.nombre }}{% endblock %}
 {% block contenido %}
   <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold">{{ cliente.nombre }}</h1>
+    <div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Ficha del cliente</p><h1 class="mt-1 text-2xl font-semibold">{{ cliente.nombre }}</h1></div>
     <div class="flex flex-wrap gap-2">
+      <a class="btn-secundario" href="{{ url_for('clientes') }}">Volver a clientes</a>
       <a class="btn-secundario" href="{{ url_for('cliente_editar', cliente_id=cliente.id) }}">Editar</a>
       {% if es_dueno %}
         <form method="post" action="{{ url_for('cliente_eliminar', cliente_id=cliente.id) }}" onsubmit="return confirm('¿Eliminar este cliente y sus vehículos?');">
@@ -23,10 +24,41 @@
     </dl>
   </section>
 
-  <section class="tarjeta mb-6">
+  <section class="mb-6" aria-labelledby="titulo-resumen-cliente">
+    <div class="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p class="modulo-etiqueta">Seguimiento</p><h2 id="titulo-resumen-cliente" class="text-lg font-semibold">Resumen del cliente</h2></div><a class="enlace text-sm" href="{{ url_for('vehiculos') }}">Buscar otro vehículo</a></div>
+    <div class="grid gap-3 sm:grid-cols-2 {{ 'xl:grid-cols-4' if es_dueno else 'xl:grid-cols-3' }}">
+      <article class="kpi-operativo"><p>Vehículos registrados</p><strong>{{ vehiculos|length }}</strong><span>Asociados a esta ficha</span></article>
+      <article class="kpi-operativo"><p>Órdenes activas</p><strong>{{ ordenes_activas|length }}</strong><span>Pendientes o en proceso</span></article>
+      <article class="kpi-operativo"><p>Órdenes históricas</p><strong>{{ ordenes|length }}</strong><span>Incluye órdenes finalizadas y anuladas</span></article>
+      {% if es_dueno %}<article class="kpi-operativo {{ 'kpi-alerta' if saldo_pendiente_centavos }}"><p>Saldo por cobrar</p><strong>{{ saldo_pendiente_centavos|dinero }}</strong><span>Órdenes completadas con cobro conciliado</span></article>{% endif %}
+    </div>
+  </section>
+
+  <section class="mb-6" aria-labelledby="titulo-ordenes-activas">
+    <div class="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p class="modulo-etiqueta">Trabajo en curso</p><h2 id="titulo-ordenes-activas" class="text-lg font-semibold">Órdenes activas</h2></div><a class="btn-primario" href="#vehiculos-cliente">Crear orden</a></div>
+    {% if ordenes_activas %}
+      <div class="grid gap-3 xl:grid-cols-2">
+        {% for o in ordenes_activas %}
+          <article class="tarjeta">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div><a class="orden-numero" href="{{ url_for('orden_detalle', orden_id=o.id) }}">{{ o.id|num_ot }}</a><p class="mt-1 text-sm font-semibold"><a class="enlace font-mono" href="{{ url_for('vehiculo_detalle', vehiculo_id=o.vehiculo_id) }}">{{ o.patente }}</a> · {{ o.marca }} {{ o.modelo }}</p></div>
+              <span class="estado-orden estado-{{ o.estado|lower|replace(' ', '-') }}">{{ o.estado }}</span>
+            </div>
+            <p class="mt-3 line-clamp-2 text-sm text-slate-600">{{ o.fallas or 'Sin falla detallada.' }}</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-500"><span>Ingreso · {{ o.fecha_ingreso|fecha }}</span>{% if o.fecha_prometida %}<span class="plazo-badge {{ 'plazo-vencido' if o.vencida else 'plazo-hoy' if o.vence_hoy else '' }}">Entrega · {{ o.fecha_prometida|fecha }}</span>{% endif %}<span class="prioridad-badge prioridad-{{ o.prioridad|lower }}">{{ o.prioridad }}</span></div>
+            <div class="mt-4 flex items-center justify-between border-t border-slate-200 pt-3"><span class="text-xs text-slate-500">{{ o.dias }} {{ 'día' if o.dias == 1 else 'días' }} en el taller</span><a class="btn-secundario" href="{{ url_for('orden_detalle', orden_id=o.id) }}">Abrir orden</a></div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">OT</span><h2>Sin órdenes activas</h2><p>Las próximas reparaciones y su fecha comprometida aparecerán aquí.</p><a class="btn-secundario mt-4" href="#vehiculos-cliente">Elegir vehículo</a></div>
+    {% endif %}
+  </section>
+
+  <section id="vehiculos-cliente" class="tarjeta mb-6">
     <h2 class="mb-4 text-lg font-semibold">Vehículos</h2>
     {% if vehiculos %}
-      <div class="mb-6 overflow-x-auto">
+      <div class="vehiculos-cliente-tabla mb-6 overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
             <tr>
@@ -62,6 +94,15 @@
           </tbody>
         </table>
       </div>
+      <div class="vehiculos-cliente-movil mb-6">
+        {% for v in vehiculos %}
+          <article class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><a class="font-mono text-base font-bold text-red-700" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">{{ v.patente }}</a><p class="mt-1 text-sm font-semibold">{{ v.marca }} {{ v.modelo }}</p></div><a class="btn-secundario px-3 py-2" href="{{ url_for('orden_nueva', vehiculo_id=v.id) }}">Nueva orden</a></div>
+            <p class="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">{{ v.anio or 'Año no indicado' }}{% if v.color %} · {{ v.color }}{% endif %}</p>
+            <div class="mt-2 flex flex-wrap gap-3 text-sm"><a class="enlace" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">Ver historial</a><a class="enlace" href="{{ url_for('vehiculo_editar', vehiculo_id=v.id) }}">Editar</a></div>
+          </article>
+        {% endfor %}
+      </div>
     {% else %}
       <p class="mb-6 text-sm text-slate-500">Este cliente no tiene vehículos.</p>
     {% endif %}
@@ -78,6 +119,6 @@
     </form>
   </section>
 
-  <h2 class="mb-3 text-lg font-semibold">Órdenes de trabajo</h2>
+  <div class="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p class="modulo-etiqueta">Historial</p><h2 class="text-lg font-semibold">Órdenes de trabajo</h2></div><span class="text-xs text-slate-500">Más recientes primero · importes solo para el dueño</span></div>
   {% include "_tabla_ordenes.html" %}
 {% endblock %}

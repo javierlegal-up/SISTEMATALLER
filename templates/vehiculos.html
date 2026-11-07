@@ -2,20 +2,20 @@
 {% from "_macros.html" import paginacion_lista %}
 {% block titulo %}Vehículos{% endblock %}
 {% block contenido %}
-  <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-semibold">Vehículos <span class="text-lg font-normal text-slate-500">({{ paginacion.total }})</span></h1>
+  <header class="mb-2 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="text-xs font-semibold uppercase tracking-[0.12em] text-red-600">Taller · unidades</p><h1 class="mt-1">Vehículos <span class="text-base font-medium text-slate-500">({{ paginacion.total }})</span></h1></div>
     <a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a>
-  </div>
+  </header>
   <p class="mb-5 text-sm text-slate-500">Elige un vehículo para ver todo lo que se le hizo{{ ' y cuánto suma' if es_dueno }}.</p>
 
-  <form method="get" class="mb-4 flex gap-2">
-    <input class="campo !mt-0" type="search" name="q" value="{{ busqueda }}" placeholder="Buscar por patente, marca, modelo o cliente" aria-label="Buscar vehículos">
+  <form method="get" class="mb-4 flex flex-wrap gap-2">
+    <input class="campo !mt-0 min-w-56 flex-1" type="search" name="q" value="{{ busqueda }}" placeholder="Patente, marca, modelo o cliente" aria-label="Buscar vehículos">
     <button class="btn-secundario" type="submit">Buscar</button>
     {% if busqueda %}<a class="btn-secundario" href="{{ url_for('vehiculos') }}">Limpiar</a>{% endif %}
   </form>
 
   {% if vehiculos %}
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="vehiculos-tabla overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-sm">
         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
@@ -41,8 +41,16 @@
         </tbody>
       </table>
     </div>
+    <div class="vehiculos-movil">
+      {% for v in vehiculos %}
+        <article class="tarjeta mb-3">
+          <div class="flex items-start justify-between gap-3"><div><a class="font-mono text-base font-bold text-red-700" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">{{ v.patente }}</a><h2 class="mt-1 text-sm font-semibold">{{ v.marca }} {{ v.modelo }}{% if v.anio %} · {{ v.anio }}{% endif %}</h2></div><a class="btn-secundario px-3 py-2" href="{{ url_for('vehiculo_detalle', vehiculo_id=v.id) }}">Historial</a></div>
+          <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-sm"><div><dt class="text-xs text-slate-500">Titular</dt><dd class="mt-0.5"><a class="enlace" href="{{ url_for('cliente_detalle', cliente_id=v.cliente_id) }}">{{ v.cliente_nombre }}</a></dd></div><div><dt class="text-xs text-slate-500">Órdenes</dt><dd class="mt-0.5 font-semibold tabular-nums">{{ v.total_ordenes }}</dd></div><div><dt class="text-xs text-slate-500">Última visita</dt><dd class="mt-0.5">{{ v.ultima_visita|fecha or '—' }}</dd></div>{% if es_dueno %}<div><dt class="text-xs text-slate-500">Total completado</dt><dd class="mt-0.5 font-semibold">{{ v.total_completado|dinero }}</dd></div>{% endif %}</dl>
+        </article>
+      {% endfor %}
+    </div>
     {{ paginacion_lista(paginacion) }}
   {% else %}
-    <p class="tarjeta text-sm text-slate-500">No hay vehículos para mostrar.</p>
+    <div class="tarjeta estado-vacio"><span class="estado-vacio-icono" aria-hidden="true">VH</span><h2>{% if busqueda %}No encontramos ese vehículo{% else %}Todavía no hay vehículos{% endif %}</h2><p>{% if busqueda %}Comprueba la patente, marca, modelo o titular, o limpia la búsqueda.{% else %}Registra el cliente y sus datos para abrir la primera orden de trabajo.{% endif %}</p><div class="mt-4 flex gap-2">{% if busqueda %}<a class="btn-secundario" href="{{ url_for('vehiculos') }}">Limpiar búsqueda</a>{% endif %}<a class="btn-primario" href="{{ url_for('cliente_nuevo') }}">Registrar cliente</a></div></div>
   {% endif %}
 {% endblock %}

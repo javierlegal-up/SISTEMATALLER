@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import paginacion_lista %}
+{% block titulo %}Compras{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Abastecimiento</p>
+      <h1 class="text-2xl font-semibold">Compras</h1>
+      <p class="mt-1 text-sm text-slate-500">Los borradores no cambian el inventario; una recepción confirmada sí.</p>
+    </div>
+    <div class="flex gap-2"><a class="btn-secundario" href="{{ url_for('proveedores') }}">Proveedores</a><a class="btn-primario" href="{{ url_for('compra_nueva') }}">Nueva compra</a></div>
+  </header>
+  <section data-filtro-lista aria-label="Historial de compras">
+  <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+    <div><h2 class="font-semibold">Historial de compras</h2><p class="mt-1 text-xs text-slate-500">Busca en todo el historial. Abre una compra para revisar recepciones y pagos.</p></div>
+    <span class="text-xs font-semibold tabular-nums text-slate-500" data-filtro-resultados aria-live="polite"></span>
+  </div>
+  <form method="get" class="mb-3 grid items-end gap-3 sm:grid-cols-[minmax(14rem,1fr)_minmax(10rem,auto)_auto]" role="search">
+    <label class="etiqueta" for="buscar-compra">Buscar en todo el historial
+      <input id="buscar-compra" class="campo" type="search" name="q" value="{{ busqueda }}" data-filtro-busqueda placeholder="Proveedor, documento o número…">
+    </label>
+    <label class="etiqueta">Estado
+      <select class="campo" name="estado">
+        <option value="todos" {{ 'selected' if estado == 'todos' }}>Todos</option>
+        <option value="Borrador" {{ 'selected' if estado == 'Borrador' }}>Borrador</option>
+        <option value="Parcial" {{ 'selected' if estado == 'Parcial' }}>Parcial</option>
+        <option value="Recibida" {{ 'selected' if estado == 'Recibida' }}>Recibida</option>
+        <option value="Anulada" {{ 'selected' if estado == 'Anulada' }}>Anulada</option>
+      </select>
+    </label>
+    <button class="btn-secundario" type="submit">Aplicar filtros</button>
+    {% if busqueda or estado != 'todos' %}<a class="btn-secundario" href="{{ url_for('compras') }}">Limpiar</a>{% endif %}
+  </form>
+  <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <table data-mobile-cards class="w-full text-left text-sm">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500"><tr>
+        <th class="px-4 py-3">N.º</th><th class="px-4 py-3">Fecha</th><th class="px-4 py-3">Proveedor</th><th class="px-4 py-3">Documento</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Artículos</th><th class="px-4 py-3 text-right">Total de compra</th>
+      </tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for c in compras %}<tr data-filtro-item data-filtro-grupo="{{ c.estado }}" data-filtro-texto="C-{{ '%05d'|format(c.id) }} {{ c.proveedor }} {{ c.documento }} {{ c.fecha }}">
+          <td class="px-4 py-3"><a class="enlace font-mono" href="{{ url_for('compra_detalle', compra_id=c.id) }}">C-{{ '%05d'|format(c.id) }}</a></td>
+          <td class="px-4 py-3">{{ c.fecha|fecha }}</td><td class="px-4 py-3">{{ c.proveedor }}</td><td class="px-4 py-3">{{ c.documento or '—' }}</td>
+          <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-xs {{ 'bg-emerald-50 text-emerald-700' if c.estado == 'Recibida' else 'bg-amber-50 text-amber-700' if c.estado == 'Parcial' else 'bg-slate-100 text-slate-600' }}">{{ c.estado }}</span></td>
+          <td class="px-4 py-3 text-right tabular-nums">{{ c.lineas }}</td><td class="px-4 py-3 text-right tabular-nums">{{ c.valor_centavos|dinero }}</td>
+        </tr>{% else %}<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">Todavía no hay compras registradas.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="tarjeta mt-3 text-sm text-slate-500" data-filtro-vacio hidden>No hay compras que coincidan con la búsqueda y el estado.</p>
+  {{ paginacion_lista(paginacion) }}
+  </section>
+{% endblock %}

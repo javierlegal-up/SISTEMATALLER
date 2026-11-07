@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .campo { @apply mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 transition-all duration-200 focus:border-red-400 focus:outline-none focus:ring-4 focus:ring-red-500/10; }
+  .etiqueta { @apply block text-sm font-medium tracking-tight text-slate-700; }
+  .tarjeta { @apply rounded-2xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/60 transition-all duration-300 hover:shadow-md; }
+  .btn { @apply relative isolate inline-flex cursor-pointer select-none items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-center text-sm font-semibold tracking-tight transition-all duration-300 ease-out active:scale-[0.97]; }
+  .btn:disabled { @apply pointer-events-none opacity-50; }
+  .btn-primario { @apply btn bg-gradient-to-b from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:from-red-500 hover:to-red-700 hover:shadow-xl hover:shadow-red-500/50 hover:ring-4 hover:ring-red-500/20; }
+  .btn-primario::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, .45) 50%, transparent 75%);
+    transform: translateX(-110%);
+    transition: transform .7s ease;
+  }
+  .btn-primario:hover::before { transform: translateX(110%); }
+  .btn-acento { @apply btn border border-red-200 bg-white text-red-700 shadow-lg shadow-red-500/10 hover:border-red-600 hover:text-white hover:shadow-red-500/40; }
+  .btn-secundario { @apply btn border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-red-600 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
+  .btn-peligro { @apply btn border border-red-200 bg-white text-red-700 shadow-sm hover:border-red-700 hover:text-white hover:shadow-md hover:shadow-red-500/30; }
+  .btn-acento, .btn-secundario, .btn-peligro {
+    background-image: linear-gradient(to right, #dc2626, #ef4444);
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: 0% 100%;
+  }
+  .btn-acento:hover, .btn-secundario:hover, .btn-peligro:hover { background-size: 100% 100%; }
+  .enlace { @apply font-medium text-red-600 transition-colors hover:text-red-700 hover:underline hover:underline-offset-4; }
+}

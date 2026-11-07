@@ -15,29 +15,31 @@
 
 {% macro fila_repuesto(l) %}
   <tr class="fila-linea align-top {{ 'bg-amber-50' if es_dueno and l.falta_precio }}" data-tipo="Repuesto">
-    <td class="py-1 pr-2">
+    <td class="py-1 pr-2" data-label="Repuesto">
       <input type="hidden" name="item_id" value="{{ l.item_id }}">
       <input type="hidden" name="item_tipo" value="Repuesto">
+      <input type="hidden" class="linea-catalogo-id" name="item_catalogo_id" value="{{ l.catalogo_id or '' }}">
       <input type="hidden" class="linea-cliente-valor" name="item_cliente" value="{{ '1' if l.del_cliente else '0' }}">
       <input class="campo !mt-0 linea-descripcion min-w-48" name="item_descripcion" value="{{ l.descripcion }}" list="lista-repuestos" placeholder="Ej.: Aceite sintético 5W40" aria-label="Repuesto" autocomplete="off">
       {{ aviso_sin_precio(l) }}
     </td>
-    <td class="py-1 pr-2"><input class="campo !mt-0 linea-cantidad w-20" type="number" name="item_cantidad" value="{{ l.cantidad or '1' }}" min="0.01" step="0.01" aria-label="Cantidad"></td>
+    <td class="py-1 pr-2" data-label="Cantidad"><input class="campo !mt-0 linea-cantidad w-20" type="number" name="item_cantidad" value="{{ l.cantidad or '1' }}" min="0.01" step="0.01" aria-label="Cantidad"></td>
     {% if es_dueno %}
-      <td class="py-1 pr-2"><input class="campo !mt-0 linea-precio w-28 {{ 'bg-slate-100' if l.del_cliente }}" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente, por unidad" {{ 'readonly' if l.del_cliente }}></td>
-      <td class="py-1 pr-2"><input class="campo !mt-0 linea-costo w-28 {{ 'bg-slate-100' if l.del_cliente else 'bg-slate-50' }}" type="number" name="item_costo" value="{{ l.costo }}" min="0" step="0.01" placeholder="Opcional" aria-label="Te costó a ti, por unidad" {{ 'readonly' if l.del_cliente }}></td>
+      <td class="py-1 pr-2" data-label="Precio unitario"><input class="campo !mt-0 linea-precio w-28 {{ 'bg-slate-100' if l.del_cliente }}" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente, por unidad" {{ 'readonly' if l.del_cliente }}></td>
+      <td class="py-1 pr-2" data-label="Costo unitario"><input class="campo !mt-0 linea-costo w-28 {{ 'bg-slate-100' if l.del_cliente else 'bg-slate-50' }}" type="number" name="item_costo" value="{{ l.costo }}" min="0" step="0.01" placeholder="Opcional" aria-label="Te costó a ti, por unidad" {{ 'readonly' if l.del_cliente }}></td>
     {% endif %}
-    <td class="py-3 pr-2"><label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600"><input type="checkbox" class="linea-cliente h-4 w-4" {{ 'checked' if l.del_cliente }}>Lo trae el cliente</label></td>
-    {% if es_dueno %}<td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right">$0,00</td>{% endif %}
-    <td class="py-1 text-right"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar repuesto">✕</button></td>
+    <td class="py-3 pr-2" data-label="Origen"><label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600"><input type="checkbox" class="linea-cliente h-4 w-4" {{ 'checked' if l.del_cliente }}>Lo trae el cliente</label></td>
+    {% if es_dueno %}<td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right" data-label="Subtotal">$0,00</td>{% endif %}
+    <td class="py-1 text-right" data-label="Acciones"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar repuesto">✕ Quitar</button></td>
   </tr>
 {% endmacro %}
 
 {% macro fila_mano_obra(l) %}
   <tr class="fila-linea align-top {{ 'bg-amber-50' if es_dueno and l.falta_precio }}" data-tipo="Servicio">
-    <td class="py-1 pr-2">
+    <td class="py-1 pr-2" data-label="Trabajo">
       <input type="hidden" name="item_id" value="{{ l.item_id }}">
       <input type="hidden" name="item_tipo" value="Servicio">
+      <input type="hidden" name="item_catalogo_id" value="">
       <input type="hidden" name="item_cliente" value="0">
       {# La cantidad y el costo no se piden para la mano de obra, pero se conservan si ya existían. #}
       <input type="hidden" class="linea-cantidad" name="item_cantidad" value="{{ l.cantidad or '1' }}">
@@ -46,10 +48,10 @@
       {{ aviso_sin_precio(l) }}
     </td>
     {% if es_dueno %}
-      <td class="py-1 pr-2"><input class="campo !mt-0 linea-precio w-32" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente"></td>
-      <td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right">$0,00</td>
+      <td class="py-1 pr-2" data-label="Precio al cliente"><input class="campo !mt-0 linea-precio w-32" type="number" name="item_precio" value="{{ l.precio }}" min="0" step="0.01" placeholder="Sin precio" aria-label="Le cobras al cliente"></td>
+      <td class="linea-subtotal whitespace-nowrap py-3 pr-2 text-right" data-label="Subtotal">$0,00</td>
     {% endif %}
-    <td class="py-1 text-right"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar trabajo">✕</button></td>
+    <td class="py-1 text-right" data-label="Acciones"><button type="button" class="btn-peligro quitar-linea" aria-label="Quitar trabajo">✕ Quitar</button></td>
   </tr>
 {% endmacro %}
 
@@ -94,6 +96,12 @@
           </label>
           <label class="etiqueta">Fecha de ingreso *<input class="campo" type="date" name="fecha_ingreso" value="{{ orden.fecha_ingreso }}" required></label>
           <label class="etiqueta">Kilometraje<input class="campo" type="number" name="kilometraje" value="{{ orden.kilometraje }}" min="0" step="1"></label>
+          {% if es_dueno %}
+            <label class="etiqueta">Fecha prometida<input class="campo" type="date" name="fecha_prometida" value="{{ orden.fecha_prometida or '' }}" min="{{ orden.fecha_ingreso }}"><span class="mt-1 block text-xs font-normal text-slate-500">Opcional · compromiso acordado con el cliente</span></label>
+            <label class="etiqueta">Prioridad<select class="campo" name="prioridad">{% for p in PRIORIDADES_ORDEN %}<option value="{{ p }}" {{ 'selected' if orden.prioridad|default('Normal') == p }}>{{ p }}</option>{% endfor %}</select></label>
+          {% else %}
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm sm:col-span-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Agenda definida por el dueño</p><p class="mt-1">Fecha prometida: <strong>{{ orden.fecha_prometida|fecha if orden.fecha_prometida else 'Sin definir' }}</strong> · Prioridad: <strong>{{ orden.prioridad|default('Normal') }}</strong></p></div>
+          {% endif %}
           <label class="etiqueta sm:col-span-3">Fallas reportadas *<textarea class="campo" name="fallas" rows="3" required>{{ orden.fallas }}</textarea></label>
           <label class="etiqueta sm:col-span-3">Diagnóstico / trabajo realizado<textarea class="campo" name="diagnostico" rows="3">{{ orden.diagnostico }}</textarea></label>
           <label class="etiqueta sm:col-span-3">Notas para el cliente<textarea class="campo" name="notas" rows="2">{{ orden.notas }}</textarea></label>
@@ -112,7 +120,7 @@
             </div>
             <button type="button" class="btn-secundario" data-agregar="Repuesto">+ Agregar repuesto</button>
           </div>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto orden-editable-table">
             <table class="w-full text-left text-sm">
               <thead class="text-xs uppercase text-slate-500">
                 <tr>
@@ -143,7 +151,7 @@
             </div>
             <button type="button" class="btn-secundario" data-agregar="Servicio">+ Agregar mano de obra</button>
           </div>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto orden-editable-table">
             <table class="w-full text-left text-sm">
               <thead class="text-xs uppercase text-slate-500">
                 <tr>
@@ -301,6 +309,10 @@
           // Si se elige algo de la lista de precios, se completan precio y costo (siguen editables).
           const item = CATALOGO.find((c) => c.nombre === evento.target.value && c.tipo === fila.dataset.tipo);
           const delCliente = fila.querySelector(".linea-cliente")?.checked;
+          const catalogoId = fila.querySelector(".linea-catalogo-id");
+          if (catalogoId) {
+            catalogoId.value = item && item.controla_stock && !delCliente ? String(item.id) : "";
+          }
           if (item && !delCliente && fila.querySelector(".linea-precio")) {
             fila.querySelector(".linea-precio").value = item.precio;
             if (fila.dataset.tipo === "Repuesto") fila.querySelector(".linea-costo").value = item.costo;
@@ -312,6 +324,10 @@
       seccion.addEventListener("change", (evento) => {
         if (evento.target.classList.contains("linea-cliente")) {
           marcarDelCliente(evento.target.closest(".fila-linea"), evento.target.checked);
+          const fila = evento.target.closest(".fila-linea");
+          const catalogoId = fila.querySelector(".linea-catalogo-id");
+          const articulo = CATALOGO.find((c) => c.nombre === fila.querySelector(".linea-descripcion").value && c.tipo === "Repuesto" && c.controla_stock);
+          if (catalogoId) catalogoId.value = articulo && !evento.target.checked ? String(articulo.id) : "";
         }
         recalcular();
       });

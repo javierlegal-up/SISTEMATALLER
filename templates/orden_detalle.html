@@ -3,11 +3,15 @@
 {% block titulo %}{{ orden.id|num_ot }}{% endblock %}
 {% block contenido %}
   {# El empleado ve qué se hizo, pero no importes; tampoco imprime, borra ni toca órdenes completadas. #}
-  {% set puede_editar = es_dueno or orden.estado != 'Completado' %}
+  {% set puede_editar = not orden.anulada and (es_dueno or orden.estado != 'Completado') %}
   <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
       <h1 class="text-2xl font-semibold">{{ orden.id|num_ot }}</h1>
-      {{ estado_badge(orden.estado) }}
+      {% if orden.anulada %}
+        <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">Anulada</span>
+      {% else %}
+        {{ estado_badge(orden.estado) }}
+      {% endif %}
       {% if es_dueno and orden.lineas_sin_precio %}
         <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Falta poner precio</span>
       {% endif %}
@@ -19,14 +23,16 @@
       {% if puede_editar %}
         <a class="btn-secundario" href="{{ url_for('orden_editar', orden_id=orden.id) }}">{{ 'Editar y poner precios' if es_dueno and orden.lineas_sin_precio else 'Editar' }}</a>
       {% endif %}
-      {% if es_dueno %}
-        <form method="post" action="{{ url_for('orden_eliminar', orden_id=orden.id) }}" onsubmit="return confirm('¿Eliminar esta orden de trabajo? No se puede deshacer.');">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button class="btn-peligro" type="submit">Eliminar</button>
-        </form>
-      {% endif %}
     </div>
   </div>
+
+  {% if orden.anulacion %}
+    <section class="mb-6 rounded-xl border border-slate-200 bg-slate-100 p-4 text-sm" role="status">
+      <h2 class="font-semibold text-slate-800">Orden anulada · {{ orden.anulacion.anulada_en|momento }}</h2>
+      <p class="mt-1">Motivo: {{ orden.anulacion.motivo }}</p>
+      <p class="mt-1 text-xs text-slate-500">Registró: {{ orden.anulacion.usuario_nombre or 'usuario eliminado' }}</p>
+    </section>
+  {% endif %}
 
   <div class="mb-6 grid gap-6 md:grid-cols-3">
     <section class="tarjeta text-sm">
@@ -53,6 +59,8 @@
         {% if not es_dueno %}<p class="mt-2 text-xs text-slate-500">Para entregarla, avisa al dueño: él pone los precios y la completa.</p>{% endif %}
       {% endif %}
       <p class="mt-2 text-slate-600">Ingreso: {{ orden.fecha_ingreso|fecha }}</p>
+      <p class="text-slate-600">Fecha prometida: {{ orden.fecha_prometida|fecha if orden.fecha_prometida else 'Sin definir' }}</p>
+      <p class="text-slate-600">Prioridad: <strong class="{{ 'text-red-700' if orden.prioridad in ('Alta', 'Urgente') else '' }}">{{ orden.prioridad }}</strong>{% if orden.fecha_prometida and orden.fecha_prometida < hoy_iso and orden.estado != 'Completado' %}<span class="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Plazo vencido</span>{% elif orden.fecha_prometida == hoy_iso and orden.estado != 'Completado' %}<span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Vence hoy</span>{% endif %}</p>
       {% if orden.fecha_completado %}<p class="text-slate-600">Completado: {{ orden.fecha_completado|fecha }}</p>{% endif %}
     </section>
   </div>
@@ -90,6 +98,7 @@
                 <th class="py-2 pr-4 text-right">Precio unit.</th>
                 <th class="py-2 text-right">Subtotal</th>
                 <th class="py-2 pl-4 text-right text-slate-400" title="Uso interno: no aparece en el comprobante">Tu costo</th>
+                <th class="py-2 pl-4 text-left text-slate-500">Control de repuestos</th>
               {% endif %}
             </tr>
           </thead>
@@ -107,6 +116,25 @@
                     <td class="py-2 text-right">{{ i.subtotal_centavos|dinero }}</td>
                   {% endif %}
                   <td class="py-2 pl-4 text-right text-slate-500">{{ i.costo_total_centavos|dinero if i.costo_total_centavos is not none else '—' }}</td>
+                  <td class="py-2 pl-4">
+                    {% if i.controla_stock and not i.del_cliente %}
+                      <div class="min-w-52 space-y-1">
+                        <p class="text-xs text-slate-500">Disponible: {{ i.stock_actual_milesimas|cantidad_stock }} {{ i.unidad }}</p>
+                        {% if i.consumo_activo_id %}
+                          <span class="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Consumo registrado</span>
+                        {% elif not i.falta_precio %}
+                          <form method="post" action="{{ url_for('orden_item_consumir', orden_id=orden.id, item_id=i.id) }}" class="space-y-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input id="motivo-stock-{{ i.id }}" class="campo !mt-0 px-2 py-1 text-xs" name="motivo" aria-label="Dónde se instaló {{ i.descripcion }}" minlength="5" maxlength="300" placeholder="Lugar de instalación" required>
+                            <button class="text-xs font-semibold text-red-700 hover:underline" type="submit" {% if i.stock_actual_milesimas < (i.cantidad * 1000)|int %}disabled{% endif %}>Registrar consumo · {{ i.cantidad|cantidad }} {{ i.unidad }}</button>
+                          </form>
+                          {% if i.stock_actual_milesimas < (i.cantidad * 1000)|int %}<p class="text-xs text-amber-700">Stock insuficiente para esta cantidad.</p>{% endif %}
+                        {% else %}
+                          <span class="text-xs text-amber-700">Completa el precio antes de registrar el consumo.</span>
+                        {% endif %}
+                      </div>
+                    {% else %}<span class="text-xs text-slate-400">—</span>{% endif %}
+                  </td>
                 {% endif %}
               </tr>
             {% endfor %}
@@ -115,6 +143,21 @@
       </div>
     {% else %}
       <p class="text-sm text-slate-500">Todavía no se cargaron repuestos ni mano de obra.</p>
+    {% endif %}
+
+    {% if lineas_reemplazadas %}
+      <section class="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 p-4" aria-labelledby="titulo-lineas-reemplazadas">
+        <h3 id="titulo-lineas-reemplazadas" class="text-sm font-semibold text-amber-900">Líneas reemplazadas</h3>
+        <p class="mt-1 text-xs text-amber-800">Se conservan por el historial de stock y no forman parte del importe vigente de la orden.</p>
+        <ul class="mt-3 space-y-2 text-sm">
+          {% for linea in lineas_reemplazadas %}
+            <li class="flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2">
+              <span>{{ linea.descripcion }} · {{ linea.cantidad|cantidad }} {{ 'unidad' if linea.cantidad == 1 else 'unidades' }}</span>
+              <span class="text-xs font-semibold text-amber-800">Reemplazada</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
     {% endif %}
 
     {% if es_dueno %}
@@ -134,8 +177,83 @@
           <p class="mt-1 text-xs text-amber-700">{{ costos.sin_costo }} {{ 'repuesto' if costos.sin_costo == 1 else 'repuestos' }} sin costo cargado: la ganancia real es menor que la estimada.</p>
         {% endif %}
       </div>
+
+      <section class="mt-6 border-t border-slate-100 pt-5" aria-labelledby="titulo-cobros">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="titulo-cobros" class="font-semibold">Cobros y saldo</h2>
+            {% if orden.cobro_sin_conciliar %}
+              <p class="mt-1 text-xs text-amber-800">Orden histórica: todavía no se sabe cuánto se cobró antes de activar este registro.</p>
+            {% else %}
+              <p class="mt-1 text-sm text-slate-600">Cobrado: <strong>{{ orden.pagado_centavos|dinero }}</strong> · Saldo: <strong>{{ orden.saldo_centavos|dinero }}</strong></p>
+            {% endif %}
+          </div>
+          {% if not orden.cobro_sin_conciliar and not orden.anulada and orden.saldo_centavos > 0 %}
+            <form method="post" action="{{ url_for('orden_pago_nuevo', orden_id=orden.id) }}" class="grid gap-2 sm:grid-cols-5">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label class="etiqueta">Importe<input class="campo" type="number" name="importe" min="0.01" step="0.01" max="{{ orden.saldo_centavos|importe_input }}" required></label>
+              <label class="etiqueta">Medio
+                <select class="campo" name="medio" required><option value="">Elegir</option>{% for medio in MEDIOS_PAGO %}<option>{{ medio }}</option>{% endfor %}</select>
+              </label>
+              <label class="etiqueta">Fecha<input class="campo" type="date" name="fecha" value="{{ hoy_iso }}" required></label>
+              <label class="etiqueta">Referencia<input class="campo" name="referencia" maxlength="120" placeholder="Opcional"></label>
+              <button class="btn-primario self-end" type="submit">Registrar cobro</button>
+            </form>
+          {% endif %}
+        </div>
+
+        {% if orden.cobro_sin_conciliar and not orden.anulada %}
+          <form method="post" action="{{ url_for('orden_cobros_conciliar', orden_id=orden.id) }}" class="mt-4 grid gap-3 rounded-xl bg-amber-50 p-4 sm:grid-cols-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="etiqueta">Importe ya cobrado<input class="campo" type="number" name="importe_pagado" min="0" max="{{ orden.total|importe_input }}" step="0.01" value="0" required></label>
+            <label class="etiqueta sm:col-span-2">Motivo / referencia de conciliación<input class="campo" name="motivo" minlength="5" maxlength="500" required></label>
+            <button class="btn-secundario sm:col-span-3" type="submit">Conciliar histórico</button>
+          </form>
+        {% endif %}
+
+        {% if pagos %}
+          <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500"><tr><th class="px-3 py-2">Fecha</th><th class="px-3 py-2">Movimiento</th><th class="px-3 py-2">Medio / motivo</th><th class="px-3 py-2">Registró</th><th class="px-3 py-2 text-right">Importe</th><th class="px-3 py-2"></th></tr></thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for pago in pagos %}
+                  <tr>
+                    <td class="px-3 py-2">{{ pago.fecha|fecha }}</td>
+                    <td class="px-3 py-2">{{ {'cobro': 'Cobro', 'reversion': 'Reversión', 'apertura': 'Saldo histórico'}[pago.tipo] }}</td>
+                    <td class="px-3 py-2">{{ pago.motivo or pago.referencia or pago.medio }}</td>
+                    <td class="px-3 py-2">{{ pago.usuario_nombre or '—' }}</td>
+                    <td class="px-3 py-2 text-right">{{ (-pago.importe_centavos if pago.tipo == 'reversion' else pago.importe_centavos)|dinero }}</td>
+                    <td class="px-3 py-2 text-right">
+                      {% if es_dueno and pago.tipo in ('cobro', 'apertura') and not pago.reversion_id %}
+                        <form method="post" action="{{ url_for('orden_pago_revertir', orden_id=orden.id, pago_id=pago.id) }}" class="flex gap-1">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                          <input class="campo !mt-0 min-w-32 px-2 py-1" name="motivo" minlength="5" maxlength="500" placeholder="Motivo de reversión" required aria-label="Motivo de reversión">
+                          <button class="text-red-700 hover:underline" type="submit">Revertir</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </section>
     {% endif %}
   </section>
+
+  {% if es_dueno and not orden.anulada %}
+    <details class="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+      <summary class="cursor-pointer text-sm font-semibold text-red-700">Anular orden de trabajo</summary>
+      <p class="mt-2 text-xs text-slate-500">La orden y sus líneas se conservarán en el historial. Reversa primero los cobros registrados.</p>
+      <form method="post" action="{{ url_for('orden_anular', orden_id=orden.id) }}" class="mt-3 flex flex-wrap gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="sr-only" for="motivo-anular-orden">Motivo para anular esta orden</label>
+        <input id="motivo-anular-orden" class="campo !mt-0 min-w-64 flex-1" name="motivo" minlength="5" maxlength="500" placeholder="Motivo de anulación" required>
+        <button class="btn-peligro" type="submit">Confirmar anulación</button>
+      </form>
+    </details>
+  {% endif %}
 
   {% if es_dueno and historial %}
     <section class="tarjeta mt-6 text-sm">

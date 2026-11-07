@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Copias y restauración{% endblock %}
+{% block contenido %}
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div><p class="modulo-etiqueta">Administración de datos</p><h1>Copias y restauración</h1><p class="mt-1 text-sm text-slate-500">Crear, consultar, descargar y recuperar las copias del taller desde un solo lugar.</p></div>
+    <a class="btn-secundario" href="{{ url_for('inicio') }}">Volver al panel</a>
+  </header>
+
+  <section class="mb-5 grid gap-4 lg:grid-cols-3" aria-label="Estado de las copias">
+    <article class="tarjeta"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Última copia</p><p class="mt-2 text-xl font-bold tabular-nums">{{ ultimo_respaldo|fecha if ultimo_respaldo else 'Todavía no hay copias' }}</p><p class="mt-1 text-sm text-slate-500">{{ cantidad_respaldos }} archivos locales disponibles</p></article>
+    <article class="tarjeta"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Último Excel</p><p class="mt-2 text-xl font-bold tabular-nums">{{ ultimo_excel|fecha if ultimo_excel else 'Todavía no hay Excel' }}</p><p class="mt-1 text-sm text-slate-500">Libro de consulta generado desde los datos del sistema</p></article>
+    <article class="tarjeta flex flex-col justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Acciones de copia</p><p class="mt-2 text-sm text-slate-600">Actualiza la base SQLite y genera una planilla descargable para consulta.</p></div><div class="flex flex-wrap gap-2">
+      <form method="post" action="{{ url_for('respaldo_ahora') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="volver" value="restaurar"><button class="btn-primario" type="submit">Hacer copia ahora</button></form>
+      <a class="btn-secundario" href="{{ url_for('respaldo_excel', volver='restaurar') }}">Descargar Excel</a>
+    </div></article>
+  </section>
+
+  <section class="tarjeta mx-auto max-w-4xl" aria-labelledby="titulo-restaurar">
+    <div class="mb-5"><p class="modulo-etiqueta">Recuperación</p><h2 id="titulo-restaurar" class="text-xl font-semibold">Restaurar una copia SQLite</h2><p class="mt-1 text-sm text-slate-500">Elige un archivo del taller creado anteriormente para recuperar sus datos.</p></div>
+    <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert"><strong>La restauración reemplaza los datos actuales.</strong> Antes de aplicarla, el sistema valida integridad y relaciones, actualiza el esquema y guarda la base activa como respaldo previo.</div>
+    <form method="post" enctype="multipart/form-data" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="etiqueta">Archivo de base de datos (.db, .sqlite o .sqlite3)<input class="campo" type="file" name="archivo" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3" required></label>
+      <p class="text-xs text-slate-500">Tamaño máximo: 100 MB. El archivo Excel sirve para consultar o imprimir; no puede restaurarse.</p>
+      <div class="flex flex-wrap justify-end gap-2"><a class="btn-secundario" href="{{ url_for('inicio') }}">Cancelar</a><button class="btn-peligro" type="submit" onclick="return confirm('¿Reemplazar la base actual por la copia seleccionada?');">Validar y restaurar</button></div>
+    </form>
+  </section>
+{% endblock %}

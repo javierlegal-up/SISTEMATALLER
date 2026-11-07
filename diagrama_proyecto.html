@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cómo funciona Taller San Cayetano</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      color-scheme: light;
+      --paper: #f5f5f5;
+      --paper-2: #ececec;
+      --ink: #2d3142;
+      --muted: #4f5d75;
+      --soft: #5a6580;
+      --rule: rgba(45, 49, 66, .12);
+      --accent: #bf4520;
+      --accent-tint: rgba(191, 69, 32, .08);
+      --link: #2e5aa8;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', 'Noto Serif', serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 36px 20px 28px;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--sans);
+    }
+    main { width: min(1120px, 100%); margin: 0 auto; }
+    .eyebrow, .technical, .section-label, .footer {
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1, h2 { margin: 0; font-family: var(--serif); font-weight: 400; }
+    h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.05; }
+    .intro {
+      max-width: 720px;
+      margin: 12px 0 30px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    section { margin-top: 34px; }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    h2 { font-size: 28px; }
+    .section-label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    .section-copy { max-width: 760px; margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .diagram-container { width: 100%; min-width: 0; overflow-x: auto; }
+    svg { display: block; width: 100%; min-width: 960px; }
+    .notes {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .module-card {
+      min-height: 132px;
+      padding: 14px;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: #fff;
+    }
+    .module-card h3 { margin: 12px 0 5px; font-size: 15px; font-weight: 600; }
+    .module-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .status {
+      display: inline-block;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font: 9px var(--mono);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .status-live { color: #215c45; background: #e7f3ed; }
+    .status-next { color: #80501e; background: #f8efdf; }
+    .note {
+      padding: 12px 14px;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .note strong { color: var(--ink); font-weight: 600; }
+    .footer {
+      margin-top: 30px;
+      padding-top: 12px;
+      border-top: 1px solid var(--rule);
+      font-size: 10px;
+      line-height: 1.5;
+    }
+    @media (max-width: 620px) {
+      body { padding: 24px 14px; }
+      .notes { grid-template-columns: 1fr; }
+      .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 3px; }
+    }
+    @media (max-width: 380px) {
+      .module-grid { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { padding: 12mm; }
+      .diagram-container { overflow: visible; }
+      svg { min-width: 0; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Guía visual · ERP propio del taller</p>
+      <h1>Cómo funciona Taller San Cayetano</h1>
+      <p class="intro">El sistema reúne el trabajo del taller y su administración en módulos propios. Hoy funciona en esta computadora: el navegador muestra las pantallas, Flask aplica las reglas y SQLite guarda los datos.</p>
+    </header>
+
+    <section aria-labelledby="arquitectura-titulo">
+      <div class="section-head">
+        <h2 id="arquitectura-titulo">Las piezas principales</h2>
+        <span class="section-label">Arquitectura · recorrido de los datos</span>
+      </div>
+      <p class="section-copy">Seguí las flechas: desde que abrís el sistema hasta dónde quedan los datos y sus copias.</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 960 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="taller-arquitectura-title taller-arquitectura-desc">
+          <title id="taller-arquitectura-title">Componentes del sistema del taller</title>
+          <desc id="taller-arquitectura-desc">iniciar.bat abre Flask; Flask sirve las pantallas, lee y guarda en SQLite, y genera respaldos locales que pueden copiarse a un pendrive o una carpeta en la nube.</desc>
+          <defs>
+            <marker id="taller-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+            <marker id="taller-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+            <marker id="taller-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+            <marker id="taller-arrow-start" markerWidth="8" markerHeight="6" refX="1" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#4f5d75"/></marker>
+          </defs>
+          <rect width="960" height="460" fill="#f5f5f5"/>
+
+          <!-- Zones -->
+          <rect x="24" y="72" width="200" height="162" rx="8" fill="rgba(45,49,66,.02)" stroke="rgba(45,49,66,.12)" stroke-width="1"/>
+          <rect x="250" y="72" width="470" height="162" rx="8" fill="rgba(45,49,66,.02)" stroke="rgba(45,49,66,.12)" stroke-width="1"/>
+          <rect x="250" y="260" width="686" height="166" rx="8" fill="rgba(45,49,66,.02)" stroke="rgba(45,49,66,.12)" stroke-width="1"/>
+          <rect x="40" y="76" width="82" height="14" rx="2" fill="#f5f5f5"/>
+          <text x="44" y="87" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing=".12em">INICIO</text>
+          <rect x="266" y="76" width="154" height="14" rx="2" fill="#f5f5f5"/>
+          <text x="270" y="87" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing=".12em">PANTALLAS Y APLICACIÓN</text>
+          <rect x="266" y="264" width="150" height="14" rx="2" fill="#f5f5f5"/>
+          <text x="270" y="275" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing=".12em">DATOS Y RESPALDOS</text>
+
+          <!-- Connectors: arrows are behind nodes. -->
+          <path d="M 212,158 H 280" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#taller-arrow)"/>
+          <path d="M 470,151 H 535" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#taller-arrow-link)"/>
+          <path d="M 535,175 H 470" fill="none" stroke="#4f5d75" stroke-width="1.1" marker-end="url(#taller-arrow)"/>
+          <path d="M 366,208 V 304" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#taller-arrow-accent)"/>
+          <path d="M 382,304 V 208" fill="none" stroke="#4f5d75" stroke-width="1.1" marker-end="url(#taller-arrow)"/>
+          <path d="M 470,356 H 530" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#taller-arrow)"/>
+          <path d="M 710,356 H 770" fill="none" stroke="#4f5d75" stroke-width="1.1" stroke-dasharray="5,4" marker-end="url(#taller-arrow)"/>
+
+          <!-- Opaque arrow-label masks, separated from their strokes. -->
+          <rect x="227" y="137" width="38" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="246" y="146" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".06em">ABRE</text>
+          <rect x="486" y="130" width="34" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="503" y="139" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".06em">HTML</text>
+          <rect x="486" y="181" width="34" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="503" y="190" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".06em">FORM</text>
+          <rect x="394" y="244" width="82" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="398" y="253" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing=".04em">LEE / GUARDA</text>
+          <rect x="480" y="338" width="40" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="500" y="347" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".06em">COPIA</text>
+          <rect x="713" y="338" width="54" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="740" y="347" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".04em">OPCIONAL</text>
+
+          <!-- Nodes -->
+          <g>
+            <rect x="36" y="112" width="176" height="92" rx="6" fill="#f5f5f5"/>
+            <rect x="36.5" y="112.5" width="175" height="91" rx="6" fill="#fff" stroke="#bfc0c0" stroke-width="1"/>
+            <rect x="48" y="124" width="58" height="14" rx="2" fill="#ececec"/>
+            <text x="77" y="134" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">WINDOWS</text>
+            <text x="124" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Abrir el sistema</text>
+            <text x="124" y="177" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">iniciar.bat</text>
+          </g>
+          <g>
+            <rect x="280" y="112" width="190" height="96" rx="6" fill="#f5f5f5"/>
+            <rect x="280.5" y="112.5" width="189" height="95" rx="6" fill="rgba(191,69,32,.08)" stroke="#bf4520" stroke-width="1.2"/>
+            <rect x="292" y="124" width="48" height="14" rx="2" fill="#bf4520"/>
+            <text x="316" y="134" fill="#fff" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">FLASK</text>
+            <text x="375" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Reglas del sistema</text>
+            <text x="375" y="178" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">app.py · permisos · validación</text>
+          </g>
+          <g>
+            <rect x="535" y="112" width="162" height="92" rx="6" fill="#f5f5f5"/>
+            <rect x="535.5" y="112.5" width="161" height="91" rx="6" fill="#fff" stroke="#bfc0c0" stroke-width="1"/>
+            <rect x="547" y="124" width="78" height="14" rx="2" fill="#ececec"/>
+            <text x="586" y="134" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">NAVEGADOR</text>
+            <text x="616" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Pantallas web</text>
+            <text x="616" y="177" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">templates/</text>
+          </g>
+          <g>
+            <rect x="280" y="304" width="190" height="104" rx="6" fill="#f5f5f5"/>
+            <rect x="280.5" y="304.5" width="189" height="103" rx="6" fill="#fff" stroke="#2d3142" stroke-width="1"/>
+            <rect x="292" y="316" width="56" height="14" rx="2" fill="#ececec"/>
+            <text x="320" y="326" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">SQLITE</text>
+            <text x="375" y="351" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Datos del taller</text>
+            <text x="375" y="372" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">taller.db</text>
+          </g>
+          <g>
+            <rect x="530" y="304" width="180" height="104" rx="6" fill="#f5f5f5"/>
+            <rect x="530.5" y="304.5" width="179" height="103" rx="6" fill="#fff" stroke="#bfc0c0" stroke-width="1"/>
+            <rect x="542" y="316" width="70" height="14" rx="2" fill="#ececec"/>
+            <text x="577" y="326" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">RESPALDOS</text>
+            <text x="620" y="351" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Copia diaria</text>
+            <text x="620" y="370" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">.db + Excel</text>
+            <text x="620" y="385" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">exportar_excel.py</text>
+          </g>
+          <g>
+            <rect x="770" y="304" width="150" height="104" rx="6" fill="#f5f5f5"/>
+            <rect x="770.5" y="304.5" width="149" height="103" rx="6" fill="#fff" stroke="#bfc0c0" stroke-width="1" stroke-dasharray="4,3"/>
+            <rect x="782" y="316" width="62" height="14" rx="2" fill="#ececec"/>
+            <text x="813" y="326" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">OPCIONAL</text>
+            <text x="845" y="351" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Pendrive</text>
+            <text x="845" y="370" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">o carpeta nube</text>
+          </g>
+        </svg>
+      </div>
+      <div class="notes">
+        <p class="note"><strong>Lo principal:</strong> los datos se guardan en <code>taller.db</code>, en esta computadora. El navegador solo muestra la interfaz.</p>
+        <p class="note"><strong>Conexión:</strong> Internet instala Flask en el primer inicio y carga los estilos de pantalla. Los datos quedan en la computadora.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="modulos-titulo">
+      <div class="section-head">
+        <h2 id="modulos-titulo">Los módulos del ERP</h2>
+        <span class="section-label">Qué resuelve hoy · qué sigue</span>
+      </div>
+      <p class="section-copy">El ERP se construye alrededor de los registros del taller. La orden de trabajo conecta cliente, vehículo, tareas, repuestos, cobros y reportes.</p>
+      <div class="module-grid" role="list" aria-label="Módulos actuales y planificados">
+        <article class="module-card" role="listitem"><span class="status status-live">Disponible</span><h3>Clientes y vehículos</h3><p>Identifica a quién pertenece cada unidad y conserva su historial de reparaciones.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-live">Disponible</span><h3>Órdenes de trabajo</h3><p>Registra diagnóstico, tareas, repuestos, estados, responsables y anulaciones trazables.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-live">Disponible</span><h3>Caja y cobros</h3><p>Admite pagos parciales, saldo pendiente, medios de pago y reversiones con motivo.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-live">Disponible</span><h3>Reportes y usuarios</h3><p>Separa trabajo terminado de dinero cobrado y limita acciones según el rol.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-next">Siguiente etapa</span><h3>Compras y proveedores</h3><p>Ingresos de mercadería, proveedores, costos, documentos de compra y cuentas por pagar.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-next">Siguiente etapa</span><h3>Inventario</h3><p>Existencias por artículo, movimientos, mínimos, consumo en órdenes y ajustes auditados.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-next">Planificado</span><h3>Gastos y contabilidad</h3><p>Registrar gastos y costos generales para obtener resultados más completos del negocio.</p></article>
+        <article class="module-card" role="listitem"><span class="status status-next">Planificado</span><h3>Facturación y operación</h3><p>Definir comprobantes, cierres, respaldos restaurables y uso multiusuario antes de ampliar el despliegue.</p></article>
+      </div>
+      <div class="notes">
+        <p class="note"><strong>El eje:</strong> una orden completada describe un trabajo terminado. La caja cambia cuando se registra un cobro real.</p>
+        <p class="note"><strong>Alcance:</strong> es un ERP propio del taller; sus módulos y datos se administran acá, sin conexión con Tango Gestión.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="orden-titulo">
+      <div class="section-head">
+        <h2 id="orden-titulo">Qué pasa con una orden</h2>
+        <span class="section-label">Estados · flujo habitual</span>
+      </div>
+      <p class="section-copy">La orden conserva su historial cuando cambia de estado; el dueño puede reabrir una completada.</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 960 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="taller-orden-title taller-orden-desc">
+          <title id="taller-orden-title">Recorrido habitual de una orden</title>
+          <desc id="taller-orden-desc">Una orden comienza pendiente, pasa a en proceso y puede completarse cuando el dueño cargó los precios. El dueño puede reabrirla.</desc>
+          <defs>
+            <marker id="estado-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+            <marker id="estado-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+          </defs>
+          <rect width="960" height="360" fill="#f5f5f5"/>
+
+          <!-- Transitions before states. -->
+          <circle cx="48" cy="140" r="6" fill="#2d3142"/>
+          <path d="M 54,140 H 100" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#estado-arrow)"/>
+          <path d="M 290,140 H 370" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#estado-arrow)"/>
+          <path d="M 560,140 H 640" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#estado-arrow-accent)"/>
+          <path d="M 735,188 V 236 Q 735,244 727,244 H 473 Q 465,244 465,236 V 188" fill="none" stroke="#4f5d75" stroke-width="1.1" marker-end="url(#estado-arrow)"/>
+
+          <!-- Transition labels with paper masks. -->
+          <rect x="303" y="120" width="54" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="330" y="129" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".04em">INICIA TAREA</text>
+          <rect x="570" y="120" width="60" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="600" y="129" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".04em">PRECIOS LISTOS</text>
+          <rect x="558" y="222" width="82" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="599" y="231" fill="#5a6580" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".04em">DUEÑO REABRE</text>
+
+          <!-- States -->
+          <g>
+            <rect x="100" y="92" width="190" height="96" rx="8" fill="#fff" stroke="#bfc0c0" stroke-width="1"/>
+            <rect x="116" y="108" width="58" height="14" rx="2" fill="#ececec"/>
+            <text x="145" y="118" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">ESTADO 1</text>
+            <text x="195" y="151" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Pendiente</text>
+            <text x="195" y="169" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">orden creada</text>
+          </g>
+          <g>
+            <rect x="370" y="92" width="190" height="96" rx="8" fill="#fff" stroke="#bfc0c0" stroke-width="1"/>
+            <rect x="386" y="108" width="58" height="14" rx="2" fill="#ececec"/>
+            <text x="415" y="118" fill="#4f5d75" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">ESTADO 2</text>
+            <text x="465" y="151" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">En proceso</text>
+            <text x="465" y="169" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">trabajo en curso</text>
+          </g>
+          <g>
+            <rect x="640" y="92" width="190" height="96" rx="8" fill="#fff" stroke="#bf4520" stroke-width="1.2"/>
+            <rect x="656" y="108" width="58" height="14" rx="2" fill="#bf4520"/>
+            <text x="685" y="118" fill="#fff" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing=".08em">CIERRE</text>
+            <text x="735" y="151" fill="#2d3142" font-size="14" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Completada</text>
+            <text x="735" y="169" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">fecha registrada</text>
+          </g>
+        </svg>
+      </div>
+      <div class="notes">
+        <p class="note"><strong>Empleado:</strong> anota fallas, repuestos y trabajos. Si falta un precio, el dueño todavía no puede completar la orden.</p>
+        <p class="note"><strong>Dueño:</strong> completa los precios antes de cerrar. El cambio queda en Actividad; completar una orden no registra un cobro en Caja.</p>
+      </div>
+    </section>
+
+    <footer class="footer">Resumen visual basado en el código y el README del proyecto. Los estilos de la página funcionan con fuentes del sistema si no hay conexión a Internet.</footer>
+  </main>
+</body>
+</html>

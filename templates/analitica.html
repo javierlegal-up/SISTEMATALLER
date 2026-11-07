@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block titulo %}Analítica del negocio{% endblock %}
+{% block contenido %}
+  {% set a = analitica %}
+  {% macro enlace_detalle(tipo, texto, clase='enlace text-xs', medio='', categoria='', descripcion='', item_tipo='') %}
+    <a class="{{ clase }}" href="{{ url_for('analitica_detalle', tipo=tipo, periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta, medio=medio or none, categoria=categoria or none, descripcion=descripcion or none, item_tipo=item_tipo or none) }}">{{ texto }}</a>
+  {% endmacro %}
+  {% macro variacion(valor, invertida=false) %}
+    {% if valor is none %}
+      <span class="text-slate-400">Sin base para comparar</span>
+    {% else %}
+      {% set favorable = (valor >= 0 and not invertida) or (valor < 0 and invertida) %}
+      <span class="font-semibold {{ 'text-emerald-700' if favorable else 'text-red-700' if valor != 0 else 'text-slate-500' }}">
+        {% if valor > 0 %}↑{% elif valor < 0 %}↓{% else %}→{% endif %} {{ valor|abs }}% vs. período anterior
+      </span>
+    {% endif %}
+  {% endmacro %}
+
+  <header class="mb-7 flex flex-wrap items-end justify-between gap-5">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-red-600">GESTIÓN DEL TALLER</p>
+      <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Analítica del negocio</h1>
+      <p class="mt-2 max-w-3xl text-sm text-slate-600">
+        Producción, rentabilidad estimada, caja, deudas e inventario. Período {{ a.fechas.desde|fecha }} al {{ a.fechas.hasta|fecha }}, comparado con un tramo anterior de igual duración.
+      </p>
+    </div>
+    <a class="btn-secundario" href="{{ url_for('reportes') }}">Reporte trimestral →</a>
+  </header>
+
+  <form method="get" class="tarjeta mb-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(190px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] lg:items-end" aria-label="Período de analítica">
+    <label class="etiqueta">Período
+      <select id="periodo-analitica" class="campo" name="periodo">
+        <option value="7d" {{ 'selected' if a.periodo == '7d' }}>Últimos 7 días</option>
+        <option value="30d" {{ 'selected' if a.periodo == '30d' }}>Últimos 30 días</option>
+        <option value="90d" {{ 'selected' if a.periodo == '90d' }}>Últimos 90 días</option>
+        <option value="12m" {{ 'selected' if a.periodo == '12m' }}>Últimos 12 meses</option>
+        <option value="personalizado" {{ 'selected' if a.periodo == 'personalizado' }}>Elegir fechas</option>
+      </select>
+    </label>
+    <label class="etiqueta" data-rango-personalizado>Desde
+      <input class="campo" type="date" name="desde" value="{{ a.fechas.desde }}" max="{{ a.fechas.hasta }}">
+    </label>
+    <label class="etiqueta" data-rango-personalizado>Hasta
+      <input class="campo" type="date" name="hasta" value="{{ a.fechas.hasta }}" max="{{ hoy_iso }}">
+    </label>
+    <button class="btn-primario" type="submit">Aplicar período</button>
+  </form>
+
+  <section class="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Indicadores económicos del período">
+    <a class="tarjeta border-l-4 border-l-red-500 transition hover:border-red-700 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='produccion', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Trabajo terminado</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.actual.trabajo|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.trabajo) }}</p>
+      <p class="mt-1 text-xs text-slate-500">{{ a.actual.ordenes_completadas }} órdenes completadas</p>
+    </a>
+    <a class="tarjeta border-l-4 border-l-emerald-500 transition hover:border-emerald-700 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='cobros', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Cobros netos</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.actual.cobrado|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.cobrado) }}</p>
+      <p class="mt-1 text-xs text-slate-500">Cobros menos reversiones, por fecha de caja</p>
+    </a>
+    <a class="tarjeta border-l-4 border-l-amber-500 transition hover:border-amber-700 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='costos', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Costo de repuestos consumidos</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.actual.costo_consumido|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.costo_consumido, true) }}</p>
+      <p class="mt-1 text-xs text-slate-500">Costo registrado en órdenes terminadas</p>
+    </a>
+    <a class="tarjeta border-l-4 border-l-orange-400 transition hover:border-orange-600 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='gastos', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Gastos generales</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.actual.gastos|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.gastos, true) }}</p>
+      <p class="mt-1 text-xs text-slate-500">Neto de reversiones en el período</p>
+    </a>
+    <a class="tarjeta border-l-4 border-l-indigo-500 transition hover:border-indigo-700 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='resultado', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Resultado estimado</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums {{ 'text-red-700' if a.actual.resultado_estimado < 0 else 'text-slate-900' }}">{{ a.actual.resultado_estimado|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.resultado_estimado) }}</p>
+      <p class="mt-1 text-xs text-slate-500">Trabajo − costo consumido − gastos generales</p>
+    </a>
+    <a class="tarjeta border-l-4 border-l-sky-500 transition hover:border-sky-700 hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='flujo', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Flujo neto de caja</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums {{ 'text-red-700' if a.actual.flujo_caja < 0 else 'text-slate-900' }}">{{ a.actual.flujo_caja|dinero }}</p>
+      <p class="mt-2 text-xs">{{ variacion(a.variaciones.flujo_caja) }}</p>
+      <p class="mt-1 text-xs text-slate-500">Cobros − pagos a proveedores − gastos</p>
+    </a>
+  </section>
+
+  {% if a.actual.sin_costo or a.estado.cuentas.historicas_sin_conciliar %}
+    <section class="mb-7 grid gap-3 md:grid-cols-2" aria-label="Datos que requieren revisión">
+      {% if a.actual.sin_costo %}
+        <a class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" href="{{ url_for('catalogo') }}">
+          <strong>{{ a.actual.sin_costo }} línea(s) de repuesto sin costo.</strong>
+          <span class="mt-1 block text-amber-800">El margen y el resultado pueden estar sobreestimados. Completar costos del catálogo para las próximas órdenes.</span>
+        </a>
+      {% endif %}
+      {% if a.estado.cuentas.historicas_sin_conciliar %}
+        <a class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950" href="{{ url_for('cuentas_cobrar') }}">
+          <strong>{{ a.estado.cuentas.historicas_sin_conciliar }} orden(es) histórica(s) sin conciliar.</strong>
+          <span class="mt-1 block text-sky-800">No se suman a la deuda actual hasta verificar sus saldos.</span>
+        </a>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Situación actual del negocio">
+    <a class="tarjeta transition hover:shadow-md" href="{{ url_for('analitica_detalle', tipo='produccion', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta) }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Ticket promedio</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.actual.ticket_promedio|dinero }}</p>
+      <p class="mt-2 text-xs text-slate-500">Trabajo terminado por orden completada</p>
+    </a>
+    <a class="tarjeta" href="{{ url_for('cuentas_cobrar') }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Por cobrar</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.estado.cuentas.por_cobrar|dinero }}</p>
+      <p class="mt-2 text-xs text-slate-500">Más de 30 días: {{ a.estado.cuentas.vencido_30|dinero }} · Más de 90: {{ a.estado.cuentas.vencido_90|dinero }}</p>
+    </a>
+    <a class="tarjeta" href="{{ url_for('cuentas_pagar') }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Por pagar a proveedores</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.estado.cuentas.por_pagar|dinero }}</p>
+      <p class="mt-2 text-xs text-slate-500">Saldo calculado sobre mercadería efectivamente recibida</p>
+    </a>
+    <a class="tarjeta" href="{{ url_for('inventario') }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Inventario valorizado</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.estado.stock.valor_centavos|dinero }}</p>
+      <p class="mt-2 text-xs text-slate-500">{{ a.estado.stock.articulos }} artículos activos con control de stock</p>
+    </a>
+    <a class="tarjeta" href="{{ url_for('ordenes', estado='atrasadas') }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Carga operativa</p>
+      <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{{ a.estado.ordenes.pendientes + a.estado.ordenes.en_proceso }} abiertas</p>
+      <p class="mt-2 text-xs {{ 'font-semibold text-red-700' if a.estado.ordenes.atrasadas else 'text-slate-500' }}">{{ a.estado.ordenes.atrasadas }} atrasadas · {{ a.estado.stock.sin_stock }} artículos sin stock</p>
+    </a>
+  </section>
+
+  <section class="mb-8 grid grid-cols-1 gap-5 xl:grid-cols-5" aria-label="Tendencia financiera y operativa">
+    <article class="tarjeta xl:col-span-3">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Producción y movimiento de caja</h2>
+        <p class="mt-1 text-xs text-slate-500">El trabajo se cuenta al completar la orden; cobros, pagos y gastos se ubican por fecha del movimiento.</p>
+      </div>
+      <div id="grafico-flujo" class="min-h-64" role="group" aria-label="Gráfico de producción, cobros, egresos y flujo neto"></div>
+      {{ enlace_detalle('movimientos', 'Ver movimientos del período →') }}
+    </article>
+    <article class="tarjeta xl:col-span-2">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Órdenes ingresadas y completadas</h2>
+        <p class="mt-1 text-xs text-slate-500">Volumen de trabajo por segmento del período seleccionado.</p>
+      </div>
+      <div id="grafico-ordenes" class="min-h-64" role="group" aria-label="Gráfico de órdenes nuevas y completadas"></div>
+      {{ enlace_detalle('ordenes', 'Ver órdenes del período →') }}
+    </article>
+  </section>
+
+  <section class="mb-8 grid grid-cols-1 gap-5 xl:grid-cols-2" aria-label="Rentabilidad y composición de movimientos">
+    <article class="tarjeta">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Margen y resultado estimado</h2>
+        <p class="mt-1 text-xs text-slate-500">Margen = trabajo terminado − costo de repuestos consumidos. Resultado = margen − gastos generales.</p>
+      </div>
+      <div id="grafico-margen" class="min-h-64" role="group" aria-label="Gráfico de margen y resultado estimado"></div>
+      {{ enlace_detalle('margen', 'Ver producción y costos →') }}
+    </article>
+    <article class="tarjeta">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Cobros netos por medio</h2>
+        <p class="mt-1 text-xs text-slate-500">Cobros menos reversiones, agrupados según el medio registrado.</p>
+      </div>
+      <div id="grafico-medios" class="min-h-64" role="group" aria-label="Gráfico de cobros por medio de pago"></div>
+      {{ enlace_detalle('cobros', 'Abrir cobros del período →') }}
+    </article>
+    <article class="tarjeta">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Gastos por rubro</h2>
+        <p class="mt-1 text-xs text-slate-500">Importe neto de reversiones durante el período.</p>
+      </div>
+      <div id="grafico-rubros" class="min-h-64" role="group" aria-label="Gráfico de gastos por categoría"></div>
+      {{ enlace_detalle('gastos', 'Abrir gastos del período →') }}
+    </article>
+    <article class="tarjeta">
+      <div class="mb-3">
+        <h2 class="text-base font-bold">Antigüedad de saldos de clientes</h2>
+        <p class="mt-1 text-xs text-slate-500">Días desde la finalización de la OT; no se configura una fecha de vencimiento. Excluye históricas sin conciliar.</p>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+      {% for etiqueta, valor, tono in [('Hasta 30 días', a.estado.cuentas.por_cobrar - a.estado.cuentas.vencido_30, 'bg-emerald-500'), ('31–60 días', a.estado.cuentas.vencido_30 - a.estado.cuentas.vencido_60, 'bg-amber-500'), ('Más de 60 días', a.estado.cuentas.vencido_60, 'bg-red-500')] %}
+          <div class="rounded-xl bg-slate-50 p-3">
+            <div class="mb-2 flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full {{ tono }}"></span><span class="text-xs font-semibold text-slate-600">{{ etiqueta }}</span></div>
+            <p class="text-lg font-bold tabular-nums">{{ valor|dinero }}</p>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full {{ tono }}" style="width: {{ (valor * 100 / a.estado.cuentas.por_cobrar)|round|int if a.estado.cuentas.por_cobrar else 0 }}%"></div></div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <a class="btn-secundario !px-3 !py-2 !text-xs" href="{{ url_for('cuentas_cobrar') }}">Revisar cuentas por cobrar</a>
+        <a class="btn-secundario !px-3 !py-2 !text-xs" href="{{ url_for('cuentas_pagar') }}">Revisar cuentas por pagar</a>
+      </div>
+    </article>
+  </section>
+
+  <section class="mb-8 grid gap-5 xl:grid-cols-2" aria-label="Desempeño de productos y stock">
+    <article class="tarjeta">
+      <div class="mb-4 flex items-end justify-between gap-3">
+        <div><h2 class="text-base font-bold">Trabajos y repuestos más vendidos</h2><p class="mt-1 text-xs text-slate-500">Por importe en órdenes completadas del período.</p>{{ enlace_detalle('trabajos', 'Ver ventas del período →') }}</div>
+        <a class="enlace text-xs" href="{{ url_for('reportes') }}">Reporte completo →</a>
+      </div>
+      {% if a.trabajos %}
+        <div class="space-y-4">
+          {% set maximo_trabajo = a.trabajos[0].importe or 1 %}
+          {% for trabajo in a.trabajos %}
+            <div>
+              <div class="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                <a class="min-w-0 truncate font-medium text-slate-800 hover:text-red-700 hover:underline" title="Ver líneas de {{ trabajo.descripcion }}" href="{{ url_for('analitica_detalle', tipo='trabajos', periodo='personalizado', desde=a.fechas.desde, hasta=a.fechas.hasta, descripcion=trabajo.descripcion, item_tipo=trabajo.tipo) }}">{{ trabajo.descripcion }}</a>
+                <span class="shrink-0 font-bold tabular-nums">{{ trabajo.importe|dinero }}</span>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full {{ 'bg-red-500' if trabajo.tipo == 'Servicio' else 'bg-slate-500' }}" style="width: {{ (trabajo.importe * 100 / maximo_trabajo)|round|int }}%"></div></div>
+              <p class="mt-1 text-[11px] text-slate-400">{{ trabajo.tipo }} · {{ trabajo.ordenes }} órdenes · cantidad {{ trabajo.cantidad|round(2) }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">No hay órdenes completadas en este período para comparar trabajos.</p>
+      {% endif %}
+    </article>
+
+    <article class="tarjeta">
+      <div class="mb-4 flex items-end justify-between gap-3">
+        <div><h2 class="text-base font-bold">Reposición prioritaria</h2><p class="mt-1 text-xs text-slate-500">Existencias actuales iguales a cero o por debajo del mínimo definido.</p></div>
+        <a class="enlace text-xs" href="{{ url_for('inventario') }}">Abrir inventario →</a>
+      </div>
+      {% if a.estado.stock.alertas %}
+        <div class="divide-y divide-slate-100">
+          {% for articulo in a.estado.stock.alertas %}
+            <div class="flex items-center justify-between gap-3 py-3">
+              <div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ articulo.nombre }}</p><p class="text-xs text-slate-500">{{ articulo.sku or 'Sin SKU' }} · mínimo {{ articulo.minimo|round(3) }} {{ articulo.unidad }}</p></div>
+              <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums {{ 'bg-red-100 text-red-800' if articulo.sin_stock else 'bg-amber-100 text-amber-900' }}">{{ articulo.cantidad|round(3) }} {{ articulo.unidad }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="rounded-xl bg-emerald-50 p-6 text-center text-sm text-emerald-800">No hay faltantes ni artículos debajo del mínimo.</p>
+      {% endif %}
+    </article>
+  </section>
+
+  <p class="mb-3 text-xs text-slate-400">Actualizado {{ a.generado }}. Los importes son estimaciones de gestión; costos faltantes y períodos sin conciliar se señalan por separado.</p>
+  <script id="datos-analitica" type="application/json">{{ {'serie': a.serie, 'medios': a.medios, 'rubros': a.rubros}|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='graficos.js') }}"></script>
+  <script>
+    (() => {
+      const datos = JSON.parse(document.getElementById("datos-analitica").textContent);
+      const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const urlDetalle = "{{ url_for('analitica_detalle') }}";
+      const rangoActual = { desde: "{{ analitica.fechas.desde }}", hasta: "{{ analitica.fechas.hasta }}" };
+      const abrirDetalle = (tipo, segmento = rangoActual, filtros = {}) => {
+        const parametros = new URLSearchParams({ tipo, periodo: "personalizado", desde: segmento.desde, hasta: segmento.hasta, ...filtros });
+        window.location.assign(`${urlDetalle}?${parametros.toString()}`);
+      };
+      const opciones = { etiquetas: datos.serie.etiquetas, titulos: datos.serie.titulos, segmentos: datos.serie.segmentos, dinero: true, alto: 260, animar: !reduceMotion };
+      Graficos.barras(document.getElementById("grafico-flujo"), {
+        ...opciones,
+        alSeleccionar: ({ segmento }) => abrirDetalle("movimientos", segmento),
+        series: [
+          { nombre: "Trabajo terminado", color: "#dc2626", valores: datos.serie.trabajo },
+          { nombre: "Cobros netos", color: "#059669", valores: datos.serie.cobrado },
+          { nombre: "Pagos a proveedores", color: "#6366f1", valores: datos.serie.pagos_proveedor },
+          { nombre: "Gastos generales", color: "#f59e0b", valores: datos.serie.gastos },
+          { nombre: "Flujo neto de caja", color: "#0ea5e9", valores: datos.serie.flujo_caja },
+        ],
+      });
+      Graficos.barras(document.getElementById("grafico-ordenes"), {
+        ...opciones, dinero: false,
+        alSeleccionar: ({ segmento }) => abrirDetalle("ordenes", segmento),
+        series: [
+          { nombre: "Ingresadas", color: "#94a3b8", valores: datos.serie.ingresadas },
+          { nombre: "Completadas", color: "#dc2626", valores: datos.serie.completadas },
+        ],
+      });
+      Graficos.barras(document.getElementById("grafico-margen"), {
+        ...opciones,
+        alSeleccionar: ({ segmento }) => abrirDetalle("resultado", segmento),
+        series: [
+          { nombre: "Margen antes de gastos", color: "#6366f1", valores: datos.serie.margen },
+          { nombre: "Resultado estimado", color: "#059669", valores: datos.serie.resultado },
+        ],
+      });
+      const unaSerie = (elemento, etiqueta, filas, color, tipo, parametro) => Graficos.barras(elemento, {
+        etiquetas: filas.length ? filas.map((fila) => fila.nombre) : ["Sin datos"],
+        series: [{ nombre: etiqueta, color, valores: filas.length ? filas.map((fila) => fila.valor) : [0] }],
+        dinero: true, alto: 240, animar: !reduceMotion,
+        alSeleccionar: ({ indice }) => {
+          const fila = filas[indice];
+          if (fila) abrirDetalle(tipo, rangoActual, { [parametro]: fila.nombre });
+        },
+      });
+      unaSerie(document.getElementById("grafico-medios"), "Cobro neto", datos.medios, "#059669", "cobros", "medio");
+      unaSerie(document.getElementById("grafico-rubros"), "Gasto neto", datos.rubros, "#f59e0b", "gastos", "categoria");
+    })();
+  </script>
+  <script>
+    (() => {
+      const selector = document.getElementById("periodo-analitica");
+      const rangos = document.querySelectorAll("[data-rango-personalizado]");
+      const actualizar = () => rangos.forEach((campo) => {
+        const visible = selector.value === "personalizado";
+        campo.hidden = !visible;
+        campo.style.display = visible ? "" : "none";
+      });
+      selector.addEventListener("change", () => {
+        actualizar();
+        if (selector.value !== "personalizado") selector.form.requestSubmit();
+      });
+      actualizar();
+    })();
+  </script>
+{% endblock %}
